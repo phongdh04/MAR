@@ -1,0 +1,16 @@
+spring:
+  datasource:
+    url: jdbc:postgresql://${MAR_DB_HOST}:${MAR_DB_PORT:5432}/${MAR_DB_NAME:mar}
+    username: ${MAR_DB_USERNAME}
+    password: ${MAR_DB_PASSWORD}
+
+logging:
+  level:
+    root: INFO
+    vn.mar: INFO
+    org.springframework.security: WARN
+
+management:
+  endpoint:
+    health:
+      show-details: never

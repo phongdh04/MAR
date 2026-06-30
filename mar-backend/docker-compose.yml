@@ -1,0 +1,22 @@
+services:
+  mar-postgres:
+    image: postgres:17
+    container_name: mar-postgres
+    environment:
+      POSTGRES_DB: ${MAR_DB_NAME:-mar}
+      POSTGRES_USER: ${MAR_DB_USERNAME:-mar_app}
+      POSTGRES_PASSWORD: ${MAR_DB_PASSWORD:-mar_app_local_password}
+      TZ: UTC
+    ports:
+      - "${MAR_DB_PORT:-5432}:5432"
+    volumes:
+      - mar-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${MAR_DB_USERNAME:-mar_app} -d ${MAR_DB_NAME:-mar}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+volumes:
+  mar-postgres-data:

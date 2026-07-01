@@ -11,6 +11,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -27,6 +28,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
 import vn.mar.MarApplication;
 import vn.mar.authz.repository.PermissionProfileRepository;
+import vn.mar.common.cache.CacheEvictionService;
 import vn.mar.common.dto.ApiResponse;
 import vn.mar.common.logging.RequestIdFilter;
 import vn.mar.security.context.CurrentUserPrincipal;
@@ -54,11 +56,19 @@ class AuthSecuritySmokeTest {
     @Autowired
     private JwtTokenProvider jwtTokenProvider;
 
+    @Autowired
+    private CacheEvictionService cacheEvictionService;
+
     @MockitoBean
     private UserRepository userRepository;
 
     @MockitoBean
     private PermissionProfileRepository permissionProfileRepository;
+
+    @BeforeEach
+    void clearPermissionCache() {
+        cacheEvictionService.clearPermissionProfiles();
+    }
 
     @Test
     void login_whenCredentialsValid_shouldReturnAccessTokenAndPermissions() throws Exception {

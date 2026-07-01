@@ -7,7 +7,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 import vn.mar.auth.dto.request.LoginRequest;
 import vn.mar.auth.dto.response.LoginResponse;
-import vn.mar.authz.repository.PermissionProfileRepository;
+import vn.mar.authz.service.PermissionProfileResolver;
 import vn.mar.common.error.ErrorCode;
 import vn.mar.common.exception.BusinessException;
 import vn.mar.security.jwt.JwtToken;
@@ -23,17 +23,17 @@ public class AuthService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtTokenProvider jwtTokenProvider;
-    private final PermissionProfileRepository permissionProfileRepository;
+    private final PermissionProfileResolver permissionProfileResolver;
 
     public AuthService(
             UserRepository userRepository,
             PasswordEncoder passwordEncoder,
             JwtTokenProvider jwtTokenProvider,
-            PermissionProfileRepository permissionProfileRepository) {
+            PermissionProfileResolver permissionProfileResolver) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtTokenProvider = jwtTokenProvider;
-        this.permissionProfileRepository = permissionProfileRepository;
+        this.permissionProfileResolver = permissionProfileResolver;
     }
 
     @Transactional(readOnly = true)
@@ -50,7 +50,7 @@ public class AuthService {
             throw invalidCredentials();
         }
 
-        Set<String> permissionCodes = permissionProfileRepository.findActivePermissionCodes(
+        Set<String> permissionCodes = permissionProfileResolver.resolvePermissionCodes(
                 user.tenantId(),
                 user.roleCode()
         );

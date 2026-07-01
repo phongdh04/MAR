@@ -10,12 +10,15 @@ import org.springframework.stereotype.Repository;
 public class PermissionProfileRepository {
 
     private static final String ACTIVE_PERMISSION_CODES_SQL = """
-            select function_code
-            from permission_profiles
-            where tenant_id = :tenantId
-              and role_code = :roleCode
-              and status = 'ACTIVE'
-              and access_level <> 'NONE'
+            select pp.function_code
+            from permission_profiles pp
+            join permissions p
+              on p.function_code = pp.function_code
+             and p.status = 'ACTIVE'
+            where pp.tenant_id = :tenantId
+              and pp.role_code = :roleCode
+              and pp.status = 'ACTIVE'
+              and pp.access_level <> 'NONE'
             """;
 
     private final NamedParameterJdbcTemplate jdbcTemplate;

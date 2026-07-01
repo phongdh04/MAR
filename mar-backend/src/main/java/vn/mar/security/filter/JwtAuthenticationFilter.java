@@ -18,7 +18,7 @@ import org.springframework.security.web.authentication.WebAuthenticationDetailsS
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 import org.springframework.web.filter.OncePerRequestFilter;
-import vn.mar.authz.repository.PermissionProfileRepository;
+import vn.mar.authz.service.PermissionProfileResolver;
 import vn.mar.common.logging.LogContext;
 import vn.mar.security.context.CurrentUser;
 import vn.mar.security.context.CurrentUserPrincipal;
@@ -32,15 +32,15 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private static final String BEARER_PREFIX = "Bearer ";
 
     private final JwtTokenProvider jwtTokenProvider;
-    private final PermissionProfileRepository permissionProfileRepository;
+    private final PermissionProfileResolver permissionProfileResolver;
     private final ApiAuthenticationEntryPoint authenticationEntryPoint;
 
     public JwtAuthenticationFilter(
             JwtTokenProvider jwtTokenProvider,
-            PermissionProfileRepository permissionProfileRepository,
+            PermissionProfileResolver permissionProfileResolver,
             ApiAuthenticationEntryPoint authenticationEntryPoint) {
         this.jwtTokenProvider = jwtTokenProvider;
-        this.permissionProfileRepository = permissionProfileRepository;
+        this.permissionProfileResolver = permissionProfileResolver;
         this.authenticationEntryPoint = authenticationEntryPoint;
     }
 
@@ -68,7 +68,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         try {
             JwtClaims claims = jwtTokenProvider.parse(token);
-            Set<String> permissionCodes = permissionProfileRepository.findActivePermissionCodes(
+            Set<String> permissionCodes = permissionProfileResolver.resolvePermissionCodes(
                     claims.tenantId(),
                     claims.roleCode()
             );

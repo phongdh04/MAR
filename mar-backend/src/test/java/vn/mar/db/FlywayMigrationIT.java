@@ -54,7 +54,9 @@ class FlywayMigrationIT {
                             .isTrue();
                 }
 
+                assertThat(columnExists(connection, "branches", "city")).isTrue();
                 assertThat(databaseObjectExists(connection, "ux_branches__tenant_code_active")).isTrue();
+                assertThat(databaseObjectExists(connection, "ux_branches__tenant_name_active")).isTrue();
                 assertThat(databaseObjectExists(connection, "ux_users__tenant_email")).isTrue();
                 assertThat(databaseObjectExists(connection, "ux_permission_profiles__tenant_role_function_scope")).isTrue();
                 assertThat(databaseObjectExists(connection, "ck_courses__tuition_non_negative")).isTrue();
@@ -71,6 +73,23 @@ class FlywayMigrationIT {
                   and table_name = ?
                 """)) {
             statement.setString(1, tableName);
+            try (ResultSet resultSet = statement.executeQuery()) {
+                resultSet.next();
+                return resultSet.getInt(1) == 1;
+            }
+        }
+    }
+
+    private boolean columnExists(Connection connection, String tableName, String columnName) throws Exception {
+        try (var statement = connection.prepareStatement("""
+                select count(*)
+                from information_schema.columns
+                where table_schema = 'public'
+                  and table_name = ?
+                  and column_name = ?
+                """)) {
+            statement.setString(1, tableName);
+            statement.setString(2, columnName);
             try (ResultSet resultSet = statement.executeQuery()) {
                 resultSet.next();
                 return resultSet.getInt(1) == 1;

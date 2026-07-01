@@ -11,6 +11,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -80,6 +81,15 @@ public class GlobalExceptionHandler {
         ErrorCode errorCode = mappedCode.orElse(ErrorCode.CONFLICT);
         ErrorResponse response = errorResponseFactory.create(errorCode, errorCode.defaultMessage(), List.of());
         return ResponseEntity.status(errorCode.httpStatus()).body(response);
+    }
+
+    @ExceptionHandler(AccessDeniedException.class)
+    public ResponseEntity<ErrorResponse> handleAccessDenied(AccessDeniedException exception) {
+        ErrorResponse response = errorResponseFactory.create(
+                ErrorCode.PERMISSION_DENIED,
+                "You do not have permission to perform this action"
+        );
+        return ResponseEntity.status(ErrorCode.PERMISSION_DENIED.httpStatus()).body(response);
     }
 
     @ExceptionHandler(Exception.class)

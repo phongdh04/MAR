@@ -9,6 +9,7 @@ import org.springframework.stereotype.Component;
 public class ConstraintErrorMapper {
 
     private static final Map<String, ErrorCode> KNOWN_CONSTRAINTS = Map.of(
+            "ux_tenants__code", ErrorCode.DUPLICATE_TENANT_CODE,
             "ux_branches__tenant_code_active", ErrorCode.DUPLICATE_ACTIVE_BRANCH,
             "ux_users__tenant_email", ErrorCode.DUPLICATE_USER_EMAIL,
             "ck_courses__tuition_non_negative", ErrorCode.NEGATIVE_TUITION,

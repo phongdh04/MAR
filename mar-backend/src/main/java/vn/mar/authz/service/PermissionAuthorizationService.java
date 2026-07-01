@@ -19,6 +19,18 @@ public class PermissionAuthorizationService {
         return principal.currentUser().hasPermission(permissionCode);
     }
 
+    public boolean hasAnyPermission(Authentication authentication, String... permissionCodes) {
+        if (permissionCodes == null || permissionCodes.length == 0) {
+            return false;
+        }
+        for (String permissionCode : permissionCodes) {
+            if (hasPermission(authentication, permissionCode)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     public void requirePermission(Authentication authentication, String permissionCode) {
         if (!hasPermission(authentication, permissionCode)) {
             throw new AccessDeniedException("Permission is required: " + permissionCode);

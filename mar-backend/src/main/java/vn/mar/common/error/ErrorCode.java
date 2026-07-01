@@ -11,6 +11,7 @@ public enum ErrorCode {
     DUPLICATE_RESOURCE("DUPLICATE_RESOURCE", HttpStatus.CONFLICT, "Resource already exists"),
     CONFLICT("CONFLICT", HttpStatus.CONFLICT, "State conflict"),
     TENANT_INACTIVE("TENANT_INACTIVE", HttpStatus.CONFLICT, "Tenant is inactive"),
+    DUPLICATE_TENANT_CODE("DUPLICATE_TENANT_CODE", HttpStatus.CONFLICT, "Tenant code already exists"),
     DUPLICATE_ACTIVE_BRANCH("DUPLICATE_ACTIVE_BRANCH", HttpStatus.CONFLICT, "Active branch code already exists"),
     DUPLICATE_USER_EMAIL("DUPLICATE_USER_EMAIL", HttpStatus.CONFLICT, "User email already exists"),
     INVALID_PARENT_STATUS("INVALID_PARENT_STATUS", HttpStatus.UNPROCESSABLE_ENTITY, "Parent status is invalid"),

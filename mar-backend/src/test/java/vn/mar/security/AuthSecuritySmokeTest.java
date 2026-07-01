@@ -27,6 +27,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
 import vn.mar.MarApplication;
+import vn.mar.audit.repository.AuditEventRepository;
 import vn.mar.authz.repository.PermissionProfileRepository;
 import vn.mar.common.cache.CacheEvictionService;
 import vn.mar.common.dto.ApiResponse;
@@ -34,6 +35,7 @@ import vn.mar.common.logging.RequestIdFilter;
 import vn.mar.security.context.CurrentUserPrincipal;
 import vn.mar.security.jwt.JwtToken;
 import vn.mar.security.jwt.JwtTokenProvider;
+import vn.mar.tenant.repository.TenantRepository;
 import vn.mar.user.entity.User;
 import vn.mar.user.model.UserStatus;
 import vn.mar.user.repository.UserRepository;
@@ -64,6 +66,12 @@ class AuthSecuritySmokeTest {
 
     @MockitoBean
     private PermissionProfileRepository permissionProfileRepository;
+
+    @MockitoBean
+    private TenantRepository tenantRepository;
+
+    @MockitoBean
+    private AuditEventRepository auditEventRepository;
 
     @BeforeEach
     void clearPermissionCache() {

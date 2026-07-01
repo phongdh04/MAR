@@ -13,8 +13,10 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import vn.mar.MarApplication;
+import vn.mar.audit.repository.AuditEventRepository;
 import vn.mar.authz.repository.PermissionProfileRepository;
 import vn.mar.common.logging.RequestIdFilter;
+import vn.mar.tenant.repository.TenantRepository;
 import vn.mar.user.repository.UserRepository;
 
 @SpringBootTest(classes = MarApplication.class)
@@ -30,6 +32,12 @@ class ApiBootstrapSmokeTest {
 
     @MockitoBean
     private PermissionProfileRepository permissionProfileRepository;
+
+    @MockitoBean
+    private TenantRepository tenantRepository;
+
+    @MockitoBean
+    private AuditEventRepository auditEventRepository;
 
     @Test
     void health_whenPublic_shouldReturnSuccessEnvelopeAndRequestId() throws Exception {

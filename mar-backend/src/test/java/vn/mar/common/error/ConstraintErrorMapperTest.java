@@ -10,6 +10,8 @@ class ConstraintErrorMapperTest {
 
     @Test
     void map_whenKnownConstraint_shouldReturnMappedErrorCode() {
+        assertThat(constraintErrorMapper.map("ux_tenants__code"))
+                .contains(ErrorCode.DUPLICATE_TENANT_CODE);
         assertThat(constraintErrorMapper.map("ux_branches__tenant_code_active"))
                 .contains(ErrorCode.DUPLICATE_ACTIVE_BRANCH);
         assertThat(constraintErrorMapper.map("ux_users__tenant_email"))

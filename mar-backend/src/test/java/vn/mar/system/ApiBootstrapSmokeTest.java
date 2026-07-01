@@ -10,9 +10,12 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import vn.mar.MarApplication;
+import vn.mar.authz.repository.PermissionProfileRepository;
 import vn.mar.common.logging.RequestIdFilter;
+import vn.mar.user.repository.UserRepository;
 
 @SpringBootTest(classes = MarApplication.class)
 @AutoConfigureMockMvc
@@ -21,6 +24,12 @@ class ApiBootstrapSmokeTest {
 
     @Autowired
     private MockMvc mockMvc;
+
+    @MockitoBean
+    private UserRepository userRepository;
+
+    @MockitoBean
+    private PermissionProfileRepository permissionProfileRepository;
 
     @Test
     void health_whenPublic_shouldReturnSuccessEnvelopeAndRequestId() throws Exception {

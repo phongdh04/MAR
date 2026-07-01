@@ -40,6 +40,10 @@ management:
       application: mar-api
 
 mar:
+  cache:
+    permission-profile:
+      ttl: ${MAR_PERMISSION_PROFILE_CACHE_TTL:10m}
+      maximum-size: ${MAR_PERMISSION_PROFILE_CACHE_MAX_SIZE:10000}
   security:
     cors:
       allowed-origins: ${MAR_CORS_ALLOWED_ORIGINS:http://localhost:3000,http://localhost:5173}

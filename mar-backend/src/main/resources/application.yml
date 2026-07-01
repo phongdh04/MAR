@@ -43,3 +43,7 @@ mar:
   security:
     cors:
       allowed-origins: ${MAR_CORS_ALLOWED_ORIGINS:http://localhost:3000,http://localhost:5173}
+    jwt:
+      issuer: ${MAR_JWT_ISSUER:mar-api}
+      secret: ${MAR_JWT_SECRET:change-me-local-development-secret-change-before-prod}
+      access-token-expiration: ${MAR_JWT_ACCESS_TOKEN_EXPIRATION:60m}

@@ -6,6 +6,9 @@ public final class AuditResourceTypes {
     public static final String BRANCH = "BRANCH";
     public static final String USER = "USER";
     public static final String PERMISSION_MATRIX = "PERMISSION_MATRIX";
+    public static final String LANGUAGE = "LANGUAGE";
+    public static final String PROGRAM = "PROGRAM";
+    public static final String COURSE = "COURSE";
 
     private AuditResourceTypes() {
     }

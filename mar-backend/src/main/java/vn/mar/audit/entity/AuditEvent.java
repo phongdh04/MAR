@@ -104,4 +104,8 @@ public class AuditEvent {
     public UUID resourceId() {
         return resourceId;
     }
+
+    public String reason() {
+        return reason;
+    }
 }

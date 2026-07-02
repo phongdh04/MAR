@@ -8,15 +8,18 @@ import org.springframework.stereotype.Component;
 @Component
 public class ConstraintErrorMapper {
 
-    private static final Map<String, ErrorCode> KNOWN_CONSTRAINTS = Map.of(
-            "ux_tenants__code", ErrorCode.DUPLICATE_TENANT_CODE,
-            "ux_branches__tenant_code_active", ErrorCode.DUPLICATE_ACTIVE_BRANCH,
-            "ux_branches__tenant_name_active", ErrorCode.DUPLICATE_ACTIVE_BRANCH,
-            "ux_users__tenant_email", ErrorCode.DUPLICATE_USER_EMAIL,
-            "fk_users__roles", ErrorCode.INVALID_PARENT_STATUS,
-            "ux_user_branches__tenant_user_branch_active", ErrorCode.DUPLICATE_RESOURCE,
-            "ck_courses__tuition_non_negative", ErrorCode.NEGATIVE_TUITION,
-            "ux_permission_profiles__tenant_role_function_scope", ErrorCode.INVALID_PERMISSION_GUARDRAIL
+    private static final Map<String, ErrorCode> KNOWN_CONSTRAINTS = Map.ofEntries(
+            Map.entry("ux_tenants__code", ErrorCode.DUPLICATE_TENANT_CODE),
+            Map.entry("ux_branches__tenant_code_active", ErrorCode.DUPLICATE_ACTIVE_BRANCH),
+            Map.entry("ux_branches__tenant_name_active", ErrorCode.DUPLICATE_ACTIVE_BRANCH),
+            Map.entry("ux_users__tenant_email", ErrorCode.DUPLICATE_USER_EMAIL),
+            Map.entry("fk_users__roles", ErrorCode.INVALID_PARENT_STATUS),
+            Map.entry("ux_user_branches__tenant_user_branch_active", ErrorCode.DUPLICATE_RESOURCE),
+            Map.entry("ck_courses__tuition_non_negative", ErrorCode.NEGATIVE_TUITION),
+            Map.entry("ux_permission_profiles__tenant_role_function_scope", ErrorCode.INVALID_PERMISSION_GUARDRAIL),
+            Map.entry("fk_permission_profiles__roles", ErrorCode.INVALID_PARENT_STATUS),
+            Map.entry("fk_permission_profiles__permissions", ErrorCode.INVALID_PERMISSION_GUARDRAIL),
+            Map.entry("ck_permission_profiles__access_level", ErrorCode.INVALID_PERMISSION_GUARDRAIL)
     );
 
     public Optional<ErrorCode> map(String constraintName) {

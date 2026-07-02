@@ -63,6 +63,9 @@ class FlywayMigrationIT {
                 assertThat(databaseObjectExists(connection, "idx_import_rows__tenant_batch_status")).isTrue();
                 assertThat(rowExists(connection, "roles", "role_code", "ADVISOR")).isTrue();
                 assertThat(rowExists(connection, "permissions", "function_code", "user.manage")).isTrue();
+                assertThat(rowExists(connection, "permissions", "function_code", "import.manage")).isTrue();
+                assertThat(rowExists(connection, "permissions", "function_code", "data.export")).isTrue();
+                assertThat(rowExists(connection, "permissions", "function_code", "payment.write")).isTrue();
             }
         }
     }

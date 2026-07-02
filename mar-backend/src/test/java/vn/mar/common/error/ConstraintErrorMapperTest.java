@@ -26,6 +26,12 @@ class ConstraintErrorMapperTest {
                 .contains(ErrorCode.NEGATIVE_TUITION);
         assertThat(constraintErrorMapper.map("ux_permission_profiles__tenant_role_function_scope"))
                 .contains(ErrorCode.INVALID_PERMISSION_GUARDRAIL);
+        assertThat(constraintErrorMapper.map("fk_permission_profiles__roles"))
+                .contains(ErrorCode.INVALID_PARENT_STATUS);
+        assertThat(constraintErrorMapper.map("fk_permission_profiles__permissions"))
+                .contains(ErrorCode.INVALID_PERMISSION_GUARDRAIL);
+        assertThat(constraintErrorMapper.map("ck_permission_profiles__access_level"))
+                .contains(ErrorCode.INVALID_PERMISSION_GUARDRAIL);
     }
 
     @Test

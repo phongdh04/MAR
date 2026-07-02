@@ -40,6 +40,30 @@ class ConstraintErrorMapperTest {
                 .contains(ErrorCode.INVALID_PARENT_STATUS);
         assertThat(constraintErrorMapper.map("ck_courses__tuition_non_negative"))
                 .contains(ErrorCode.NEGATIVE_TUITION);
+        assertThat(constraintErrorMapper.map("fk_import_rows__import_batches"))
+                .contains(ErrorCode.IMPORT_BATCH_NOT_FOUND);
+        assertThat(constraintErrorMapper.map("ck_import_batches__import_type"))
+                .contains(ErrorCode.VALIDATION_ERROR);
+        assertThat(constraintErrorMapper.map("ck_import_batches__source_type"))
+                .contains(ErrorCode.VALIDATION_ERROR);
+        assertThat(constraintErrorMapper.map("ck_import_batches__status"))
+                .contains(ErrorCode.VALIDATION_ERROR);
+        assertThat(constraintErrorMapper.map("ck_import_batches__counts_non_negative"))
+                .contains(ErrorCode.VALIDATION_ERROR);
+        assertThat(constraintErrorMapper.map("ck_import_batches__mapping_object"))
+                .contains(ErrorCode.VALIDATION_ERROR);
+        assertThat(constraintErrorMapper.map("ck_import_rows__status"))
+                .contains(ErrorCode.IMPORT_ROW_VALIDATION_ERROR);
+        assertThat(constraintErrorMapper.map("ck_import_rows__row_number_positive"))
+                .contains(ErrorCode.IMPORT_ROW_VALIDATION_ERROR);
+        assertThat(constraintErrorMapper.map("ck_import_rows__raw_row_object"))
+                .contains(ErrorCode.IMPORT_ROW_VALIDATION_ERROR);
+        assertThat(constraintErrorMapper.map("ck_import_rows__normalized_row_object"))
+                .contains(ErrorCode.IMPORT_ROW_VALIDATION_ERROR);
+        assertThat(constraintErrorMapper.map("ck_import_rows__error_details_array"))
+                .contains(ErrorCode.IMPORT_ROW_VALIDATION_ERROR);
+        assertThat(constraintErrorMapper.map("ux_import_rows__batch_row_number"))
+                .contains(ErrorCode.DUPLICATE_RESOURCE);
         assertThat(constraintErrorMapper.map("ux_permission_profiles__tenant_role_function_scope"))
                 .contains(ErrorCode.INVALID_PERMISSION_GUARDRAIL);
         assertThat(constraintErrorMapper.map("fk_permission_profiles__roles"))

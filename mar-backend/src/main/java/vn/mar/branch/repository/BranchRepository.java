@@ -1,5 +1,7 @@
 package vn.mar.branch.repository;
 
+import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.domain.Page;
@@ -13,6 +15,8 @@ import vn.mar.branch.model.BranchStatus;
 public interface BranchRepository extends JpaRepository<Branch, UUID> {
 
     Optional<Branch> findByIdAndTenantId(UUID id, UUID tenantId);
+
+    List<Branch> findByTenantIdAndIdIn(UUID tenantId, Collection<UUID> ids);
 
     boolean existsByTenantIdAndBranchCodeIgnoreCaseAndStatus(UUID tenantId, String branchCode, BranchStatus status);
 

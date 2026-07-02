@@ -67,6 +67,16 @@ Run PostgreSQL/Testcontainers migration verification when Docker Desktop is runn
 .\mvnw.cmd verify -Pintegration
 ```
 
+## Import Fixture
+
+Seed repeatable Sprint 1 lead import fixture data in local/QA profiles:
+
+```powershell
+.\mvnw.cmd spring-boot:run "-Dspring-boot.run.profiles=qa" "-Dspring-boot.run.arguments=--mar.import.fixture.enabled=true --mar.import.fixture.tenant-id=<tenant_uuid> --mar.import.fixture.actor-id=<actor_uuid> --mar.import.fixture.exit-on-complete=true"
+```
+
+The fixture creates `ImportBatch`/`ImportRow` history data only. It does not parse files, confirm imports, or create official leads.
+
 ## Convention Notes
 
 - Do not use Hibernate `ddl-auto=update`.

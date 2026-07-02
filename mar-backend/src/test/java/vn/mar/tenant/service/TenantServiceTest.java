@@ -23,6 +23,7 @@ import vn.mar.common.error.ErrorCode;
 import vn.mar.common.exception.BusinessException;
 import vn.mar.common.exception.ValidationException;
 import vn.mar.common.time.TimeProvider;
+import vn.mar.permission.service.PermissionMatrixInitializationService;
 import vn.mar.security.context.CurrentUser;
 import vn.mar.security.context.CurrentUserContext;
 import vn.mar.tenant.dto.request.CreateTenantRequest;
@@ -50,6 +51,9 @@ class TenantServiceTest {
     @Mock
     private AuditService auditService;
 
+    @Mock
+    private PermissionMatrixInitializationService permissionMatrixInitializationService;
+
     private TenantService tenantService;
 
     @BeforeEach
@@ -60,7 +64,8 @@ class TenantServiceTest {
                 new TenantMapper(),
                 timeProvider,
                 currentUserContext,
-                auditService
+                auditService,
+                permissionMatrixInitializationService
         );
         when(currentUserContext.currentUser()).thenReturn(new CurrentUser(
                 ACTOR_ID,
@@ -93,6 +98,7 @@ class TenantServiceTest {
         verify(auditService).record(auditCaptor.capture());
         assertThat(auditCaptor.getValue().action()).isEqualTo(AuditActions.TENANT_CREATED);
         assertThat(auditCaptor.getValue().actorId()).isEqualTo(ACTOR_ID);
+        verify(permissionMatrixInitializationService).initializeDefaults(response.tenantId(), ACTOR_ID, NOW);
     }
 
     @Test

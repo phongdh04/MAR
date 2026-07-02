@@ -24,6 +24,7 @@ import vn.mar.common.exception.ResourceNotFoundException;
 import vn.mar.common.exception.ValidationException;
 import vn.mar.common.logging.LogContext;
 import vn.mar.common.time.TimeProvider;
+import vn.mar.permission.service.PermissionMatrixInitializationService;
 import vn.mar.security.context.CurrentUser;
 import vn.mar.security.context.CurrentUserContext;
 import vn.mar.tenant.dto.request.CreateTenantRequest;
@@ -47,18 +48,21 @@ public class TenantService {
     private final TimeProvider timeProvider;
     private final CurrentUserContext currentUserContext;
     private final AuditService auditService;
+    private final PermissionMatrixInitializationService permissionMatrixInitializationService;
 
     public TenantService(
             TenantRepository tenantRepository,
             TenantMapper tenantMapper,
             TimeProvider timeProvider,
             CurrentUserContext currentUserContext,
-            AuditService auditService) {
+            AuditService auditService,
+            PermissionMatrixInitializationService permissionMatrixInitializationService) {
         this.tenantRepository = tenantRepository;
         this.tenantMapper = tenantMapper;
         this.timeProvider = timeProvider;
         this.currentUserContext = currentUserContext;
         this.auditService = auditService;
+        this.permissionMatrixInitializationService = permissionMatrixInitializationService;
     }
 
     @Transactional
@@ -81,6 +85,7 @@ public class TenantService {
                 now
         );
         Tenant savedTenant = tenantRepository.save(tenant);
+        permissionMatrixInitializationService.initializeDefaults(savedTenant.id(), actor.actorId(), now);
         auditTenantChange(AuditActions.TENANT_CREATED, actor, savedTenant, null, tenantMapper.toAuditData(savedTenant), null);
         return tenantMapper.toDetailResponse(savedTenant);
     }

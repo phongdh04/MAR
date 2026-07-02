@@ -55,8 +55,13 @@ class FlywayMigrationIT {
                 }
 
                 assertThat(columnExists(connection, "branches", "city")).isTrue();
+                assertThat(columnExists(connection, "programs", "exam_track")).isTrue();
+                assertThat(columnExists(connection, "courses", "level")).isTrue();
                 assertThat(databaseObjectExists(connection, "ux_branches__tenant_code_active")).isTrue();
                 assertThat(databaseObjectExists(connection, "ux_branches__tenant_name_active")).isTrue();
+                assertThat(databaseObjectExists(connection, "ux_languages__tenant_name_active")).isTrue();
+                assertThat(databaseObjectExists(connection, "ux_programs__tenant_language_name_active")).isTrue();
+                assertThat(databaseObjectExists(connection, "ux_courses__tenant_program_name_active")).isTrue();
                 assertThat(databaseObjectExists(connection, "ux_users__tenant_email")).isTrue();
                 assertThat(databaseObjectExists(connection, "ux_permission_profiles__tenant_role_function_scope")).isTrue();
                 assertThat(databaseObjectExists(connection, "ck_courses__tuition_non_negative")).isTrue();

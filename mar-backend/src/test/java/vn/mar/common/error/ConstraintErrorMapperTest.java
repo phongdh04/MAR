@@ -22,6 +22,22 @@ class ConstraintErrorMapperTest {
                 .contains(ErrorCode.INVALID_PARENT_STATUS);
         assertThat(constraintErrorMapper.map("ux_user_branches__tenant_user_branch_active"))
                 .contains(ErrorCode.DUPLICATE_RESOURCE);
+        assertThat(constraintErrorMapper.map("ux_languages__tenant_code_active"))
+                .contains(ErrorCode.DUPLICATE_RESOURCE);
+        assertThat(constraintErrorMapper.map("ux_languages__tenant_name_active"))
+                .contains(ErrorCode.DUPLICATE_RESOURCE);
+        assertThat(constraintErrorMapper.map("ux_programs__tenant_code_active"))
+                .contains(ErrorCode.DUPLICATE_RESOURCE);
+        assertThat(constraintErrorMapper.map("ux_programs__tenant_language_name_active"))
+                .contains(ErrorCode.DUPLICATE_RESOURCE);
+        assertThat(constraintErrorMapper.map("fk_programs__languages"))
+                .contains(ErrorCode.INVALID_PARENT_STATUS);
+        assertThat(constraintErrorMapper.map("ux_courses__tenant_code_active"))
+                .contains(ErrorCode.DUPLICATE_RESOURCE);
+        assertThat(constraintErrorMapper.map("ux_courses__tenant_program_name_active"))
+                .contains(ErrorCode.DUPLICATE_RESOURCE);
+        assertThat(constraintErrorMapper.map("fk_courses__programs"))
+                .contains(ErrorCode.INVALID_PARENT_STATUS);
         assertThat(constraintErrorMapper.map("ck_courses__tuition_non_negative"))
                 .contains(ErrorCode.NEGATIVE_TUITION);
         assertThat(constraintErrorMapper.map("ux_permission_profiles__tenant_role_function_scope"))

@@ -11,11 +11,15 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.validation.FieldError;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.multipart.MultipartException;
+import org.springframework.web.multipart.support.MissingServletRequestPartException;
 import vn.mar.common.dto.ApiMeta;
 import vn.mar.common.exception.MarException;
 
@@ -73,6 +77,56 @@ public class GlobalExceptionHandler {
                 details
         );
         return ResponseEntity.badRequest().body(response);
+    }
+
+    @ExceptionHandler(MissingServletRequestPartException.class)
+    public ResponseEntity<ErrorResponse> handleMissingRequestPart(MissingServletRequestPartException exception) {
+        List<ErrorDetail> details = List.of(ErrorDetail.of(
+                toJsonFieldName(exception.getRequestPartName()),
+                "REQUIRED",
+                "Required request part is missing"
+        ));
+        ErrorResponse response = errorResponseFactory.create(
+                ErrorCode.VALIDATION_ERROR,
+                ErrorCode.VALIDATION_ERROR.defaultMessage(),
+                details
+        );
+        return ResponseEntity.badRequest().body(response);
+    }
+
+    @ExceptionHandler(MissingServletRequestParameterException.class)
+    public ResponseEntity<ErrorResponse> handleMissingRequestParameter(MissingServletRequestParameterException exception) {
+        List<ErrorDetail> details = List.of(ErrorDetail.of(
+                toJsonFieldName(exception.getParameterName()),
+                "REQUIRED",
+                "Required request parameter is missing"
+        ));
+        ErrorResponse response = errorResponseFactory.create(
+                ErrorCode.VALIDATION_ERROR,
+                ErrorCode.VALIDATION_ERROR.defaultMessage(),
+                details
+        );
+        return ResponseEntity.badRequest().body(response);
+    }
+
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<ErrorResponse> handleUnreadableMessage(HttpMessageNotReadableException exception) {
+        ErrorResponse response = errorResponseFactory.create(
+                ErrorCode.VALIDATION_ERROR,
+                ErrorCode.VALIDATION_ERROR.defaultMessage(),
+                List.of(ErrorDetail.of("request_body", "INVALID_JSON", "Request body format is invalid"))
+        );
+        return ResponseEntity.badRequest().body(response);
+    }
+
+    @ExceptionHandler(MultipartException.class)
+    public ResponseEntity<ErrorResponse> handleMultipart(MultipartException exception) {
+        ErrorResponse response = errorResponseFactory.create(
+                ErrorCode.IMPORT_FILE_INVALID,
+                ErrorCode.IMPORT_FILE_INVALID.defaultMessage(),
+                List.of(ErrorDetail.of("file", "INVALID_MULTIPART", "Multipart import request is invalid"))
+        );
+        return ResponseEntity.status(ErrorCode.IMPORT_FILE_INVALID.httpStatus()).body(response);
     }
 
     @ExceptionHandler(DataIntegrityViolationException.class)

@@ -149,6 +149,39 @@ public class ImportBatch {
         );
     }
 
+    public static ImportBatch createPreview(
+            UUID id,
+            UUID tenantId,
+            ImportSourceType sourceType,
+            Map<String, Object> mappingConfig,
+            String originalFileName,
+            int totalRows,
+            int validRows,
+            int errorRows,
+            int duplicateRows,
+            UUID actorId,
+            Instant now) {
+        return new ImportBatch(
+                id,
+                tenantId,
+                ImportType.LEAD,
+                sourceType,
+                ImportBatchStatus.PREVIEWED,
+                mappingConfig,
+                null,
+                originalFileName,
+                totalRows,
+                validRows,
+                errorRows,
+                duplicateRows,
+                null,
+                now,
+                actorId,
+                now,
+                actorId
+        );
+    }
+
     public static ImportBatch restore(
             UUID id,
             UUID tenantId,

@@ -43,6 +43,8 @@ import vn.mar.catalog.repository.LanguageRepository;
 import vn.mar.catalog.repository.ProgramRepository;
 import vn.mar.common.cache.CacheEvictionService;
 import vn.mar.common.logging.RequestIdFilter;
+import vn.mar.leadimport.repository.ImportBatchRepository;
+import vn.mar.leadimport.repository.ImportRowRepository;
 import vn.mar.role.model.RoleStatus;
 import vn.mar.role.repository.RoleRepository;
 import vn.mar.security.jwt.JwtTokenProvider;
@@ -95,6 +97,12 @@ class PermissionMatrixApiSmokeTest {
 
     @MockitoBean
     private CourseRepository courseRepository;
+
+    @MockitoBean
+    private ImportBatchRepository importBatchRepository;
+
+    @MockitoBean
+    private ImportRowRepository importRowRepository;
 
     @MockitoBean
     private AuditEventRepository auditEventRepository;

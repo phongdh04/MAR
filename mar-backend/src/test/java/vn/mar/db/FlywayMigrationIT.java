@@ -61,6 +61,8 @@ class FlywayMigrationIT {
                 assertThat(databaseObjectExists(connection, "ux_permission_profiles__tenant_role_function_scope")).isTrue();
                 assertThat(databaseObjectExists(connection, "ck_courses__tuition_non_negative")).isTrue();
                 assertThat(databaseObjectExists(connection, "idx_import_rows__tenant_batch_status")).isTrue();
+                assertThat(rowExists(connection, "roles", "role_code", "ADVISOR")).isTrue();
+                assertThat(rowExists(connection, "permissions", "function_code", "user.manage")).isTrue();
             }
         }
     }
@@ -102,6 +104,16 @@ class FlywayMigrationIT {
              ResultSet resultSet = statement.executeQuery("select to_regclass('public." + objectName + "') is not null")) {
             resultSet.next();
             return resultSet.getBoolean(1);
+        }
+    }
+
+    private boolean rowExists(Connection connection, String tableName, String columnName, String value) throws Exception {
+        try (var statement = connection.prepareStatement("select count(*) from " + tableName + " where " + columnName + " = ?")) {
+            statement.setString(1, value);
+            try (ResultSet resultSet = statement.executeQuery()) {
+                resultSet.next();
+                return resultSet.getInt(1) == 1;
+            }
         }
     }
 }

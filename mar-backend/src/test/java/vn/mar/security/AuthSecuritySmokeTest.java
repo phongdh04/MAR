@@ -30,6 +30,9 @@ import vn.mar.MarApplication;
 import vn.mar.audit.repository.AuditEventRepository;
 import vn.mar.authz.repository.PermissionProfileRepository;
 import vn.mar.branch.repository.BranchRepository;
+import vn.mar.catalog.repository.CourseRepository;
+import vn.mar.catalog.repository.LanguageRepository;
+import vn.mar.catalog.repository.ProgramRepository;
 import vn.mar.common.cache.CacheEvictionService;
 import vn.mar.common.dto.ApiResponse;
 import vn.mar.common.logging.RequestIdFilter;
@@ -75,6 +78,15 @@ class AuthSecuritySmokeTest {
 
     @MockitoBean
     private BranchRepository branchRepository;
+
+    @MockitoBean
+    private LanguageRepository languageRepository;
+
+    @MockitoBean
+    private ProgramRepository programRepository;
+
+    @MockitoBean
+    private CourseRepository courseRepository;
 
     @MockitoBean
     private AuditEventRepository auditEventRepository;

@@ -38,6 +38,9 @@ import vn.mar.authz.model.PermissionProfile;
 import vn.mar.authz.model.PermissionScope;
 import vn.mar.authz.repository.PermissionProfileRepository;
 import vn.mar.branch.repository.BranchRepository;
+import vn.mar.catalog.repository.CourseRepository;
+import vn.mar.catalog.repository.LanguageRepository;
+import vn.mar.catalog.repository.ProgramRepository;
 import vn.mar.common.cache.CacheEvictionService;
 import vn.mar.common.logging.RequestIdFilter;
 import vn.mar.role.model.RoleStatus;
@@ -83,6 +86,15 @@ class PermissionMatrixApiSmokeTest {
 
     @MockitoBean
     private BranchRepository branchRepository;
+
+    @MockitoBean
+    private LanguageRepository languageRepository;
+
+    @MockitoBean
+    private ProgramRepository programRepository;
+
+    @MockitoBean
+    private CourseRepository courseRepository;
 
     @MockitoBean
     private AuditEventRepository auditEventRepository;

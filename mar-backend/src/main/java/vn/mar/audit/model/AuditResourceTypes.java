@@ -9,6 +9,7 @@ public final class AuditResourceTypes {
     public static final String LANGUAGE = "LANGUAGE";
     public static final String PROGRAM = "PROGRAM";
     public static final String COURSE = "COURSE";
+    public static final String IMPORT_BATCH = "IMPORT_BATCH";
 
     private AuditResourceTypes() {
     }

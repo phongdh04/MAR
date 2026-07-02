@@ -22,6 +22,7 @@ public final class AuditActions {
     public static final String COURSE_CREATED = "COURSE_CREATED";
     public static final String COURSE_UPDATED = "COURSE_UPDATED";
     public static final String COURSE_STATUS_CHANGED = "COURSE_STATUS_CHANGED";
+    public static final String IMPORT_BATCH_CREATED = "IMPORT_BATCH_CREATED";
 
     private AuditActions() {
     }

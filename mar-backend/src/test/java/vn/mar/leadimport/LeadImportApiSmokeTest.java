@@ -5,10 +5,12 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -26,6 +28,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpHeaders;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.web.servlet.MockMvc;
 import vn.mar.MarApplication;
 import vn.mar.audit.repository.AuditEventRepository;
@@ -110,6 +113,131 @@ class LeadImportApiSmokeTest {
     @BeforeEach
     void setUp() {
         cacheEvictionService.clearPermissionProfiles();
+    }
+
+    @Test
+    void previewLeadImport_whenLeadImportPermission_shouldReturnPreviewSummary() throws Exception {
+        when(permissionProfileRepository.findActivePermissionCodes(TENANT_ID, "ADMIN"))
+                .thenReturn(Set.of("lead.import"));
+        when(importBatchRepository.save(any(ImportBatch.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(importRowRepository.saveAll(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        mockMvc.perform(multipart("/api/v1/imports/leads/preview")
+                        .file(csvPart("""
+                                Full Name,Phone,Email
+                                Valid Lead,0900000001,valid@example.com
+                                Missing Contact,,
+                                Duplicate Phone,0900000001,duplicate@example.com
+                                """))
+                        .file(mappingPart("""
+                                {
+                                  "column_mappings": {
+                                    "full_name": "Full Name",
+                                    "phone": "Phone",
+                                    "email": "Email"
+                                  }
+                                }
+                                """))
+                        .header(RequestIdFilter.HEADER_NAME, "req_imp_preview_001")
+                        .header(HttpHeaders.AUTHORIZATION, bearerToken()))
+                .andExpect(status().isOk())
+                .andExpect(header().string(RequestIdFilter.HEADER_NAME, "req_imp_preview_001"))
+                .andExpect(jsonPath("$.data.status").value("PREVIEWED"))
+                .andExpect(jsonPath("$.data.total_rows").value(3))
+                .andExpect(jsonPath("$.data.valid_count").value(1))
+                .andExpect(jsonPath("$.data.error_count").value(1))
+                .andExpect(jsonPath("$.data.duplicate_count").value(1))
+                .andExpect(jsonPath("$.data.duplicate_candidates[0].match_type").value("PHONE_EXACT"))
+                .andExpect(jsonPath("$.data.duplicate_candidates[0].raw_value").value("***001"))
+                .andExpect(jsonPath("$.data.error_rows[0].code").value("CONTACT_IDENTIFIER_REQUIRED"))
+                .andExpect(jsonPath("$.data.valid_samples[0].normalized_row.phone").value("***001"))
+                .andExpect(jsonPath("$.data.valid_samples[0].normalized_row.email").value("v***@example.com"))
+                .andExpect(jsonPath("$.data.raw_row").doesNotExist())
+                .andExpect(jsonPath("$.meta.request_id").value("req_imp_preview_001"));
+    }
+
+    @Test
+    void previewLeadImport_whenOnlyImportManagePermission_shouldReturnForbidden() throws Exception {
+        when(permissionProfileRepository.findActivePermissionCodes(TENANT_ID, "ADMIN"))
+                .thenReturn(Set.of("import.manage"));
+
+        mockMvc.perform(multipart("/api/v1/imports/leads/preview")
+                        .file(csvPart("Full Name,Phone\nValid Lead,0900000001\n"))
+                        .file(mappingPart("""
+                                {
+                                  "column_mappings": {
+                                    "full_name": "Full Name",
+                                    "phone": "Phone"
+                                  }
+                                }
+                                """))
+                        .header(RequestIdFilter.HEADER_NAME, "req_imp_preview_002")
+                        .header(HttpHeaders.AUTHORIZATION, bearerToken()))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.error.code").value("PERMISSION_DENIED"))
+                .andExpect(jsonPath("$.meta.request_id").value("req_imp_preview_002"));
+    }
+
+    @Test
+    void previewLeadImport_whenFileMissing_shouldReturnValidationEnvelope() throws Exception {
+        when(permissionProfileRepository.findActivePermissionCodes(TENANT_ID, "ADMIN"))
+                .thenReturn(Set.of("lead.import"));
+
+        mockMvc.perform(multipart("/api/v1/imports/leads/preview")
+                        .file(mappingPart("""
+                                {
+                                  "column_mappings": {
+                                    "full_name": "Full Name",
+                                    "phone": "Phone"
+                                  }
+                                }
+                                """))
+                        .header(RequestIdFilter.HEADER_NAME, "req_imp_preview_003")
+                        .header(HttpHeaders.AUTHORIZATION, bearerToken()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.code").value("VALIDATION_ERROR"))
+                .andExpect(jsonPath("$.error.details[0].field").value("file"))
+                .andExpect(jsonPath("$.error.details[0].code").value("REQUIRED"))
+                .andExpect(jsonPath("$.meta.request_id").value("req_imp_preview_003"));
+    }
+
+    @Test
+    void previewLeadImport_whenMappingMissingContact_shouldReturnValidationEnvelope() throws Exception {
+        when(permissionProfileRepository.findActivePermissionCodes(TENANT_ID, "ADMIN"))
+                .thenReturn(Set.of("lead.import"));
+
+        mockMvc.perform(multipart("/api/v1/imports/leads/preview")
+                        .file(csvPart("Full Name,Phone\nMissing Mapping,0900000001\n"))
+                        .file(mappingPart("""
+                                {
+                                  "column_mappings": {
+                                    "full_name": "Full Name"
+                                  }
+                                }
+                                """))
+                        .header(RequestIdFilter.HEADER_NAME, "req_imp_preview_004")
+                        .header(HttpHeaders.AUTHORIZATION, bearerToken()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.code").value("VALIDATION_ERROR"))
+                .andExpect(jsonPath("$.error.details[0].code").value("CONTACT_MAPPING_REQUIRED"))
+                .andExpect(jsonPath("$.meta.request_id").value("req_imp_preview_004"));
+    }
+
+    @Test
+    void previewLeadImport_whenMappingJsonMalformed_shouldReturnValidationEnvelope() throws Exception {
+        when(permissionProfileRepository.findActivePermissionCodes(TENANT_ID, "ADMIN"))
+                .thenReturn(Set.of("lead.import"));
+
+        mockMvc.perform(multipart("/api/v1/imports/leads/preview")
+                        .file(csvPart("Full Name,Phone\nValid Lead,0900000001\n"))
+                        .file(mappingPart("{"))
+                        .header(RequestIdFilter.HEADER_NAME, "req_imp_preview_005")
+                        .header(HttpHeaders.AUTHORIZATION, bearerToken()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.code").value("VALIDATION_ERROR"))
+                .andExpect(jsonPath("$.error.details[0].field").value("request_body"))
+                .andExpect(jsonPath("$.error.details[0].code").value("INVALID_JSON"))
+                .andExpect(jsonPath("$.meta.request_id").value("req_imp_preview_005"));
     }
 
     @Test
@@ -249,6 +377,24 @@ class LeadImportApiSmokeTest {
 
     private String bearerToken() {
         return "Bearer " + jwtTokenProvider.createAccessToken(ACTOR_ID, TENANT_ID, "ADMIN").token();
+    }
+
+    private MockMultipartFile csvPart(String content) {
+        return new MockMultipartFile(
+                "file",
+                "leads.csv",
+                "text/csv",
+                content.getBytes(StandardCharsets.UTF_8)
+        );
+    }
+
+    private MockMultipartFile mappingPart(String content) {
+        return new MockMultipartFile(
+                "mapping_config",
+                "",
+                "application/json",
+                content.getBytes(StandardCharsets.UTF_8)
+        );
     }
 
     private ImportBatch batch() {

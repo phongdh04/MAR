@@ -15,9 +15,12 @@ import org.springframework.test.web.servlet.MockMvc;
 import vn.mar.MarApplication;
 import vn.mar.audit.repository.AuditEventRepository;
 import vn.mar.authz.repository.PermissionProfileRepository;
+import vn.mar.branch.repository.BranchRepository;
 import vn.mar.common.logging.RequestIdFilter;
+import vn.mar.role.repository.RoleRepository;
 import vn.mar.tenant.repository.TenantRepository;
 import vn.mar.user.repository.UserRepository;
+import vn.mar.userbranch.repository.UserBranchRepository;
 
 @SpringBootTest(classes = MarApplication.class)
 @AutoConfigureMockMvc
@@ -37,7 +40,16 @@ class ApiBootstrapSmokeTest {
     private TenantRepository tenantRepository;
 
     @MockitoBean
+    private BranchRepository branchRepository;
+
+    @MockitoBean
     private AuditEventRepository auditEventRepository;
+
+    @MockitoBean
+    private RoleRepository roleRepository;
+
+    @MockitoBean
+    private UserBranchRepository userBranchRepository;
 
     @Test
     void health_whenPublic_shouldReturnSuccessEnvelopeAndRequestId() throws Exception {

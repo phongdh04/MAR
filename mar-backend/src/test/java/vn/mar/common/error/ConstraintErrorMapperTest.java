@@ -14,8 +14,14 @@ class ConstraintErrorMapperTest {
                 .contains(ErrorCode.DUPLICATE_TENANT_CODE);
         assertThat(constraintErrorMapper.map("ux_branches__tenant_code_active"))
                 .contains(ErrorCode.DUPLICATE_ACTIVE_BRANCH);
+        assertThat(constraintErrorMapper.map("ux_branches__tenant_name_active"))
+                .contains(ErrorCode.DUPLICATE_ACTIVE_BRANCH);
         assertThat(constraintErrorMapper.map("ux_users__tenant_email"))
                 .contains(ErrorCode.DUPLICATE_USER_EMAIL);
+        assertThat(constraintErrorMapper.map("fk_users__roles"))
+                .contains(ErrorCode.INVALID_PARENT_STATUS);
+        assertThat(constraintErrorMapper.map("ux_user_branches__tenant_user_branch_active"))
+                .contains(ErrorCode.DUPLICATE_RESOURCE);
         assertThat(constraintErrorMapper.map("ck_courses__tuition_non_negative"))
                 .contains(ErrorCode.NEGATIVE_TUITION);
         assertThat(constraintErrorMapper.map("ux_permission_profiles__tenant_role_function_scope"))

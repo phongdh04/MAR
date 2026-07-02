@@ -77,6 +77,21 @@ Seed repeatable Sprint 1 lead import fixture data in local/QA profiles:
 
 The fixture creates `ImportBatch`/`ImportRow` history data only. It does not parse files, confirm imports, or create official leads.
 
+## Lead Import Preview
+
+Preview a small CSV lead import synchronously:
+
+```text
+POST /api/v1/imports/leads/preview
+Content-Type: multipart/form-data
+
+parts:
+- file: CSV file, max 1 MB and 500 data rows
+- mapping_config: JSON with column_mappings
+```
+
+Preview stores `ImportBatch`/`ImportRow` with status `PREVIEWED`, row errors and duplicate candidates. It does not confirm the batch or create official leads.
+
 ## Convention Notes
 
 - Do not use Hibernate `ddl-auto=update`.

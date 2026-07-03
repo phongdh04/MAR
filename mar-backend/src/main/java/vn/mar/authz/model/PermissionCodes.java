@@ -16,6 +16,7 @@ public final class PermissionCodes {
     public static final String IMPORT_MANAGE = "import.manage";
     public static final String LEAD_VIEW = "lead.view";
     public static final String LEAD_IMPORT = "lead.import";
+    public static final String DUPLICATE_MANAGE = "duplicate.manage";
     public static final String CUSTOMER_MERGE = "customer.merge";
     public static final String DATA_EXPORT = "data.export";
     public static final String PAYMENT_WRITE = "payment.write";

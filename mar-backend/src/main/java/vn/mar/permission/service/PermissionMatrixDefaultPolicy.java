@@ -65,6 +65,8 @@ final class PermissionMatrixDefaultPolicy {
         grant(defaults, RoleCode.ADMIN, PermissionCodes.IMPORT_VIEW, PermissionAccessLevel.VIEW, PermissionScope.TENANT);
         grant(defaults, RoleCode.ADMIN, PermissionCodes.IMPORT_MANAGE, PermissionAccessLevel.MANAGE, PermissionScope.TENANT);
         grant(defaults, RoleCode.ADMIN, PermissionCodes.LEAD_VIEW, PermissionAccessLevel.VIEW, PermissionScope.TENANT);
+        grant(defaults, RoleCode.ADMIN, PermissionCodes.DUPLICATE_MANAGE, PermissionAccessLevel.MANAGE, PermissionScope.TENANT);
+        grant(defaults, RoleCode.ADMIN, PermissionCodes.CUSTOMER_MERGE, PermissionAccessLevel.MANAGE, PermissionScope.TENANT);
         grant(defaults, RoleCode.ADMIN, PermissionCodes.AUDIT_VIEW, PermissionAccessLevel.VIEW, PermissionScope.TENANT);
 
         grant(defaults, RoleCode.CEO, PermissionCodes.TENANT_VIEW, PermissionAccessLevel.VIEW, PermissionScope.TENANT);
@@ -83,6 +85,7 @@ final class PermissionMatrixDefaultPolicy {
         grant(defaults, RoleCode.SALES_LEAD, PermissionCodes.USER_VIEW, PermissionAccessLevel.VIEW, PermissionScope.BRANCH);
         grant(defaults, RoleCode.SALES_LEAD, PermissionCodes.IMPORT_VIEW, PermissionAccessLevel.VIEW, PermissionScope.BRANCH);
         grant(defaults, RoleCode.SALES_LEAD, PermissionCodes.LEAD_VIEW, PermissionAccessLevel.VIEW, PermissionScope.BRANCH);
+        grant(defaults, RoleCode.SALES_LEAD, PermissionCodes.DUPLICATE_MANAGE, PermissionAccessLevel.MANAGE, PermissionScope.BRANCH);
 
         grant(defaults, RoleCode.ADVISOR, PermissionCodes.LEAD_VIEW, PermissionAccessLevel.VIEW, PermissionScope.OWN);
         grant(defaults, RoleCode.FINANCE, PermissionCodes.CATALOG_VIEW, PermissionAccessLevel.VIEW, PermissionScope.TENANT);

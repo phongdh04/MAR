@@ -76,6 +76,12 @@ class ConstraintErrorMapperTest {
                 .contains(ErrorCode.DUPLICATE_RESOURCE);
         assertThat(constraintErrorMapper.map("ux_customer_identities__tenant_customer_type_primary"))
                 .contains(ErrorCode.DUPLICATE_RESOURCE);
+        assertThat(constraintErrorMapper.map("ux_duplicate_cases__tenant_pair_type_open"))
+                .contains(ErrorCode.DUPLICATE_RESOURCE);
+        assertThat(constraintErrorMapper.map("ck_duplicate_cases__customers_different"))
+                .contains(ErrorCode.BUSINESS_RULE_VIOLATION);
+        assertThat(constraintErrorMapper.map("ck_duplicate_cases__resolution_reason_required"))
+                .contains(ErrorCode.VALIDATION_ERROR);
     }
 
     @Test

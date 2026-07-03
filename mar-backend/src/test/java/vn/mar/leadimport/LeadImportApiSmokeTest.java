@@ -42,6 +42,7 @@ import vn.mar.common.error.ErrorDetail;
 import vn.mar.common.logging.RequestIdFilter;
 import vn.mar.customer.repository.CustomerIdentityRepository;
 import vn.mar.customer.repository.CustomerProfileRepository;
+import vn.mar.customer.repository.DuplicateCaseRepository;
 import vn.mar.leadimport.entity.ImportBatch;
 import vn.mar.leadimport.entity.ImportRow;
 import vn.mar.leadimport.model.ImportBatchStatus;
@@ -108,6 +109,9 @@ class LeadImportApiSmokeTest {
 
     @MockitoBean
     private CustomerIdentityRepository customerIdentityRepository;
+
+    @MockitoBean
+    private DuplicateCaseRepository duplicateCaseRepository;
 
     @MockitoBean
     private ImportBatchRepository importBatchRepository;

@@ -35,7 +35,8 @@ class FlywayMigrationNamingTest {
                         "V20260702_02__expand_permission_matrix_baseline.sql",
                         "V20260702_03__add_catalog_contract_fields_and_name_uniqueness.sql",
                         "V20260703_01__create_customer_profiles.sql",
-                        "V20260703_02__create_customer_identities.sql"
+                        "V20260703_02__create_customer_identities.sql",
+                        "V20260703_03__create_duplicate_cases.sql"
                 )
                 .allMatch(fileName -> FLYWAY_NAME_PATTERN.matcher(fileName).matches());
     }

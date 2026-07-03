@@ -45,6 +45,7 @@ import vn.mar.common.cache.CacheEvictionService;
 import vn.mar.common.logging.RequestIdFilter;
 import vn.mar.customer.repository.CustomerIdentityRepository;
 import vn.mar.customer.repository.CustomerProfileRepository;
+import vn.mar.customer.repository.DuplicateCaseRepository;
 import vn.mar.leadimport.repository.ImportBatchRepository;
 import vn.mar.leadimport.repository.ImportRowRepository;
 import vn.mar.role.model.RoleStatus;
@@ -105,6 +106,9 @@ class PermissionMatrixApiSmokeTest {
 
     @MockitoBean
     private CustomerIdentityRepository customerIdentityRepository;
+
+    @MockitoBean
+    private DuplicateCaseRepository duplicateCaseRepository;
 
     @MockitoBean
     private ImportBatchRepository importBatchRepository;

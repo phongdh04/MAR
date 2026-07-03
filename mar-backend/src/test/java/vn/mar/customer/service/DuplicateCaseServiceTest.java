@@ -10,20 +10,25 @@ import static org.mockito.Mockito.when;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import vn.mar.audit.service.AuditRecordCommand;
 import vn.mar.audit.service.AuditService;
+import vn.mar.authz.model.PermissionCodes;
 import vn.mar.common.error.ErrorCode;
 import vn.mar.common.exception.BusinessException;
 import vn.mar.common.exception.ValidationException;
 import vn.mar.customer.api.DuplicateCaseCreateCommand;
 import vn.mar.customer.api.DuplicateCaseResolveCommand;
+import vn.mar.customer.api.DuplicateCaseSearchCommand;
 import vn.mar.customer.api.DuplicateCaseSnapshot;
 import vn.mar.customer.entity.CustomerIdentity;
 import vn.mar.customer.entity.CustomerProfile;
@@ -37,6 +42,8 @@ import vn.mar.customer.model.DuplicateResolutionAction;
 import vn.mar.customer.repository.CustomerIdentityRepository;
 import vn.mar.customer.repository.CustomerProfileRepository;
 import vn.mar.customer.repository.DuplicateCaseRepository;
+import vn.mar.security.context.CurrentUser;
+import vn.mar.security.context.CurrentUserContext;
 
 @ExtendWith(MockitoExtension.class)
 class DuplicateCaseServiceTest {
@@ -60,6 +67,9 @@ class DuplicateCaseServiceTest {
     @Mock
     private AuditService auditService;
 
+    @Mock
+    private CurrentUserContext currentUserContext;
+
     private DuplicateCaseService duplicateCaseService;
 
     @BeforeEach
@@ -70,6 +80,7 @@ class DuplicateCaseServiceTest {
                 customerIdentityRepository,
                 new DuplicateCaseMapper(),
                 () -> NOW,
+                currentUserContext,
                 auditService
         );
     }
@@ -201,25 +212,21 @@ class DuplicateCaseServiceTest {
     @Test
     void resolveCase_whenMergeWithoutReason_shouldReject() {
         assertThatThrownBy(() -> duplicateCaseService.resolveCase(new DuplicateCaseResolveCommand(
-                TENANT_ID,
                 DUPLICATE_CASE_ID,
-                DuplicateResolutionAction.MERGE,
-                " ",
-                ACTOR_ID,
-                "ADMIN"
+                "MERGE",
+                " "
         )))
                 .isInstanceOf(ValidationException.class);
     }
 
     @Test
-    void resolveCase_whenAdvisorAttemptsMerge_shouldRejectBeforeSaving() {
+    void resolveCase_whenDuplicateManagePermissionMissing_shouldRejectBeforeSaving() {
+        mockCurrentUser(PermissionCodes.CUSTOMER_MERGE);
+
         assertThatThrownBy(() -> duplicateCaseService.resolveCase(new DuplicateCaseResolveCommand(
-                TENANT_ID,
                 DUPLICATE_CASE_ID,
-                DuplicateResolutionAction.MERGE,
-                "Confirmed same learner",
-                ACTOR_ID,
-                "ADVISOR"
+                "MERGE",
+                "Confirmed same learner"
         )))
                 .isInstanceOf(BusinessException.class)
                 .extracting("errorCode")
@@ -231,6 +238,7 @@ class DuplicateCaseServiceTest {
 
     @Test
     void resolveCase_whenAdminMergeValid_shouldMarkMergedWithAuditReason() {
+        mockCurrentUser(PermissionCodes.DUPLICATE_MANAGE, PermissionCodes.CUSTOMER_MERGE);
         DuplicateCase duplicateCase = duplicateCase(DuplicateCaseStatus.NEEDS_REVIEW);
         when(duplicateCaseRepository.findByIdAndTenantId(DUPLICATE_CASE_ID, TENANT_ID))
                 .thenReturn(Optional.of(duplicateCase));
@@ -238,12 +246,9 @@ class DuplicateCaseServiceTest {
         when(duplicateCaseRepository.save(any(DuplicateCase.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         DuplicateCaseSnapshot result = duplicateCaseService.resolveCase(new DuplicateCaseResolveCommand(
-                TENANT_ID,
                 DUPLICATE_CASE_ID,
-                DuplicateResolutionAction.MERGE,
-                "Confirmed same learner by parent",
-                ACTOR_ID,
-                "ADMIN"
+                "MERGE",
+                "Confirmed same learner by parent"
         ));
 
         assertThat(result.status()).isEqualTo(DuplicateCaseStatus.MERGED);
@@ -258,6 +263,7 @@ class DuplicateCaseServiceTest {
 
     @Test
     void resolveCase_whenSalesLeadIgnoreValid_shouldMarkIgnored() {
+        mockCurrentUser(PermissionCodes.DUPLICATE_MANAGE);
         DuplicateCase duplicateCase = duplicateCase(DuplicateCaseStatus.NEEDS_REVIEW);
         when(duplicateCaseRepository.findByIdAndTenantId(DUPLICATE_CASE_ID, TENANT_ID))
                 .thenReturn(Optional.of(duplicateCase));
@@ -265,12 +271,9 @@ class DuplicateCaseServiceTest {
         when(duplicateCaseRepository.save(any(DuplicateCase.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         DuplicateCaseSnapshot result = duplicateCaseService.resolveCase(new DuplicateCaseResolveCommand(
-                TENANT_ID,
                 DUPLICATE_CASE_ID,
-                DuplicateResolutionAction.IGNORE,
-                "Different learners sharing guardian email",
-                ACTOR_ID,
-                "SALES_LEAD"
+                "IGNORE",
+                "Different learners sharing guardian email"
         ));
 
         assertThat(result.status()).isEqualTo(DuplicateCaseStatus.IGNORED);
@@ -279,16 +282,14 @@ class DuplicateCaseServiceTest {
 
     @Test
     void resolveCase_whenAlreadyResolved_shouldRejectConflict() {
+        mockCurrentUser(PermissionCodes.DUPLICATE_MANAGE);
         when(duplicateCaseRepository.findByIdAndTenantId(DUPLICATE_CASE_ID, TENANT_ID))
                 .thenReturn(Optional.of(duplicateCase(DuplicateCaseStatus.MERGED)));
 
         assertThatThrownBy(() -> duplicateCaseService.resolveCase(new DuplicateCaseResolveCommand(
-                TENANT_ID,
                 DUPLICATE_CASE_ID,
-                DuplicateResolutionAction.IGNORE,
-                "Wrong case",
-                ACTOR_ID,
-                "ADMIN"
+                "IGNORE",
+                "Wrong case"
         )))
                 .isInstanceOf(BusinessException.class)
                 .extracting("errorCode")
@@ -297,11 +298,59 @@ class DuplicateCaseServiceTest {
         verify(duplicateCaseRepository, never()).save(any(DuplicateCase.class));
     }
 
+    @Test
+    void resolveCase_whenMergeWithoutCustomerMergePermission_shouldRejectBeforeSaving() {
+        mockCurrentUser(PermissionCodes.DUPLICATE_MANAGE);
+
+        assertThatThrownBy(() -> duplicateCaseService.resolveCase(new DuplicateCaseResolveCommand(
+                DUPLICATE_CASE_ID,
+                "MERGE",
+                "Confirmed same learner"
+        )))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.PERMISSION_DENIED);
+
+        verify(duplicateCaseRepository, never()).save(any(DuplicateCase.class));
+        verify(auditService, never()).record(any(AuditRecordCommand.class));
+    }
+
+    @Test
+    void searchCases_whenFiltersValid_shouldReturnPaginatedSnapshots() {
+        mockCurrentUser(PermissionCodes.DUPLICATE_MANAGE);
+        when(duplicateCaseRepository.search(
+                TENANT_ID,
+                DuplicateCaseStatus.NEEDS_REVIEW,
+                DuplicateMatchType.NEAR_MATCH,
+                PageRequest.of(0, 20, org.springframework.data.domain.Sort.by(org.springframework.data.domain.Sort.Direction.DESC, "createdAt"))
+        )).thenReturn(new PageImpl<>(List.of(duplicateCase(DuplicateCaseStatus.NEEDS_REVIEW)), PageRequest.of(0, 20), 1));
+
+        var result = duplicateCaseService.searchCases(new DuplicateCaseSearchCommand(
+                "NEEDS_REVIEW",
+                "NEAR_MATCH",
+                0,
+                20
+        ));
+
+        assertThat(result.totalElements()).isEqualTo(1);
+        assertThat(result.items().getFirst().duplicateCaseId()).isEqualTo(DUPLICATE_CASE_ID);
+    }
+
     private void mockCustomerPair() {
         when(customerProfileRepository.findByIdAndTenantId(SOURCE_CUSTOMER_ID, TENANT_ID))
                 .thenReturn(Optional.of(sourceCustomer()));
         when(customerProfileRepository.findByIdAndTenantId(MATCHED_CUSTOMER_ID, TENANT_ID))
                 .thenReturn(Optional.of(matchedCustomer()));
+    }
+
+    private void mockCurrentUser(String... permissionCodes) {
+        when(currentUserContext.currentUser()).thenReturn(new CurrentUser(
+                ACTOR_ID,
+                TENANT_ID,
+                "ADMIN",
+                Set.of(permissionCodes),
+                "req-test"
+        ));
     }
 
     private DuplicateCaseCreateCommand createCommand(DuplicateConfidence confidence, String reviewReason) {

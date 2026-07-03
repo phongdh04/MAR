@@ -20,6 +20,7 @@ import vn.mar.catalog.repository.CourseRepository;
 import vn.mar.catalog.repository.LanguageRepository;
 import vn.mar.catalog.repository.ProgramRepository;
 import vn.mar.common.logging.RequestIdFilter;
+import vn.mar.customer.repository.CustomerIdentityRepository;
 import vn.mar.customer.repository.CustomerProfileRepository;
 import vn.mar.leadimport.repository.ImportBatchRepository;
 import vn.mar.leadimport.repository.ImportRowRepository;
@@ -59,6 +60,9 @@ class ApiBootstrapSmokeTest {
 
     @MockitoBean
     private CustomerProfileRepository customerProfileRepository;
+
+    @MockitoBean
+    private CustomerIdentityRepository customerIdentityRepository;
 
     @MockitoBean
     private ImportBatchRepository importBatchRepository;

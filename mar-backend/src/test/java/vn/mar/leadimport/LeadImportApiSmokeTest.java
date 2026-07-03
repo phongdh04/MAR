@@ -40,6 +40,7 @@ import vn.mar.catalog.repository.ProgramRepository;
 import vn.mar.common.cache.CacheEvictionService;
 import vn.mar.common.error.ErrorDetail;
 import vn.mar.common.logging.RequestIdFilter;
+import vn.mar.customer.repository.CustomerProfileRepository;
 import vn.mar.leadimport.entity.ImportBatch;
 import vn.mar.leadimport.entity.ImportRow;
 import vn.mar.leadimport.model.ImportBatchStatus;
@@ -100,6 +101,9 @@ class LeadImportApiSmokeTest {
 
     @MockitoBean
     private CourseRepository courseRepository;
+
+    @MockitoBean
+    private CustomerProfileRepository customerProfileRepository;
 
     @MockitoBean
     private ImportBatchRepository importBatchRepository;

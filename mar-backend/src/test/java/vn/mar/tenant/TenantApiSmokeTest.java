@@ -37,6 +37,7 @@ import vn.mar.catalog.repository.LanguageRepository;
 import vn.mar.catalog.repository.ProgramRepository;
 import vn.mar.common.cache.CacheEvictionService;
 import vn.mar.common.logging.RequestIdFilter;
+import vn.mar.customer.repository.CustomerProfileRepository;
 import vn.mar.leadimport.repository.ImportBatchRepository;
 import vn.mar.leadimport.repository.ImportRowRepository;
 import vn.mar.role.repository.RoleRepository;
@@ -86,6 +87,9 @@ class TenantApiSmokeTest {
 
     @MockitoBean
     private CourseRepository courseRepository;
+
+    @MockitoBean
+    private CustomerProfileRepository customerProfileRepository;
 
     @MockitoBean
     private ImportBatchRepository importBatchRepository;

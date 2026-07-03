@@ -33,7 +33,8 @@ class FlywayMigrationNamingTest {
                         "V20260701_01__add_branch_city_and_name_uniqueness.sql",
                         "V20260702_01__seed_roles_and_permissions.sql",
                         "V20260702_02__expand_permission_matrix_baseline.sql",
-                        "V20260702_03__add_catalog_contract_fields_and_name_uniqueness.sql"
+                        "V20260702_03__add_catalog_contract_fields_and_name_uniqueness.sql",
+                        "V20260703_01__create_customer_profiles.sql"
                 )
                 .allMatch(fileName -> FLYWAY_NAME_PATTERN.matcher(fileName).matches());
     }

@@ -61,7 +61,7 @@ public class DuplicateCaseController {
             @PathVariable UUID caseId,
             @Valid @RequestBody ResolveDuplicateCaseRequest request) {
         DuplicateCaseSnapshot snapshot = duplicateCaseManagementService.resolveCase(
-                new DuplicateCaseResolveCommand(caseId, request.action(), request.reason())
+                new DuplicateCaseResolveCommand(caseId, request.action(), request.targetCustomerId(), request.reason())
         );
         return ResponseEntity.ok(ApiResponse.success(duplicateCaseMapper.toResponse(snapshot)));
     }

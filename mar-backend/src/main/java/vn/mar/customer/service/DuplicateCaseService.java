@@ -63,6 +63,7 @@ public class DuplicateCaseService implements DuplicateCaseManagementService {
     private final TimeProvider timeProvider;
     private final CurrentUserContext currentUserContext;
     private final AuditService auditService;
+    private final CustomerMergeService customerMergeService;
 
     public DuplicateCaseService(
             DuplicateCaseRepository duplicateCaseRepository,
@@ -71,7 +72,8 @@ public class DuplicateCaseService implements DuplicateCaseManagementService {
             DuplicateCaseMapper duplicateCaseMapper,
             TimeProvider timeProvider,
             CurrentUserContext currentUserContext,
-            AuditService auditService) {
+            AuditService auditService,
+            CustomerMergeService customerMergeService) {
         this.duplicateCaseRepository = duplicateCaseRepository;
         this.customerProfileRepository = customerProfileRepository;
         this.customerIdentityRepository = customerIdentityRepository;
@@ -79,6 +81,7 @@ public class DuplicateCaseService implements DuplicateCaseManagementService {
         this.timeProvider = timeProvider;
         this.currentUserContext = currentUserContext;
         this.auditService = auditService;
+        this.customerMergeService = customerMergeService;
     }
 
     @Override
@@ -132,11 +135,20 @@ public class DuplicateCaseService implements DuplicateCaseManagementService {
             );
         }
 
-        ensureCustomerExists(tenantId, duplicateCase.sourceCustomerId(), "source_customer_id");
-        ensureCustomerExists(tenantId, duplicateCase.matchedCustomerId(), "candidate_customer_id");
+        CustomerProfile sourceCustomer = ensureCustomerExists(tenantId, duplicateCase.sourceCustomerId(), "source_customer_id");
+        CustomerProfile matchedCustomer = ensureCustomerExists(tenantId, duplicateCase.matchedCustomerId(), "candidate_customer_id");
+        CustomerProfile targetCustomer = null;
+        CustomerProfile mergeSourceCustomer = null;
+        if (action == DuplicateResolutionAction.MERGE) {
+            targetCustomer = resolveMergeTarget(command.targetCustomerId(), sourceCustomer, matchedCustomer);
+            mergeSourceCustomer = sourceCustomer.id().equals(targetCustomer.id()) ? matchedCustomer : sourceCustomer;
+        }
         Map<String, Object> beforeData = duplicateCaseMapper.toAuditData(duplicateCase);
         duplicateCase.resolve(action, reason, actor.actorId(), timeProvider.now());
         DuplicateCase savedCase = duplicateCaseRepository.save(duplicateCase);
+        if (action == DuplicateResolutionAction.MERGE) {
+            customerMergeService.recordMerge(savedCase, mergeSourceCustomer, targetCustomer, actor, reason);
+        }
         auditResolved(savedCase, beforeData, actor, reason);
         return duplicateCaseMapper.toSnapshot(savedCase);
     }
@@ -265,6 +277,26 @@ public class DuplicateCaseService implements DuplicateCaseManagementService {
         if (command.duplicateCaseId() == null) {
             throw validation("duplicate_case_id", "REQUIRED", "Duplicate case id is required");
         }
+    }
+
+    private CustomerProfile resolveMergeTarget(
+            UUID targetCustomerId,
+            CustomerProfile sourceCustomer,
+            CustomerProfile matchedCustomer) {
+        if (targetCustomerId == null) {
+            throw validation("target_customer_id", "REQUIRED", "Target customer id is required for merge");
+        }
+        if (targetCustomerId.equals(sourceCustomer.id())) {
+            return sourceCustomer;
+        }
+        if (targetCustomerId.equals(matchedCustomer.id())) {
+            return matchedCustomer;
+        }
+        throw new BusinessException(
+                ErrorCode.BUSINESS_RULE_VIOLATION,
+                "Merge target must belong to the duplicate case",
+                List.of(ErrorDetail.of("target_customer_id", "TARGET_NOT_IN_DUPLICATE_CASE", "Target customer must belong to the duplicate case"))
+        );
     }
 
     private void assertEmailExactPhoneDifferent(DuplicateCustomerPair customerPair) {

@@ -41,7 +41,10 @@ public class ConstraintErrorMapper {
             Map.entry("fk_permission_profiles__permissions", ErrorCode.INVALID_PERMISSION_GUARDRAIL),
             Map.entry("ck_permission_profiles__access_level", ErrorCode.INVALID_PERMISSION_GUARDRAIL),
             Map.entry("ux_customer_identities__tenant_customer_type_value", ErrorCode.DUPLICATE_RESOURCE),
-            Map.entry("ux_customer_identities__tenant_customer_type_primary", ErrorCode.DUPLICATE_RESOURCE)
+            Map.entry("ux_customer_identities__tenant_customer_type_primary", ErrorCode.DUPLICATE_RESOURCE),
+            Map.entry("ux_duplicate_cases__tenant_pair_type_open", ErrorCode.DUPLICATE_RESOURCE),
+            Map.entry("ck_duplicate_cases__customers_different", ErrorCode.BUSINESS_RULE_VIOLATION),
+            Map.entry("ck_duplicate_cases__resolution_reason_required", ErrorCode.VALIDATION_ERROR)
     );
 
     public Optional<ErrorCode> map(String constraintName) {

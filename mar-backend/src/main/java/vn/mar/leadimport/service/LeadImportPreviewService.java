@@ -10,7 +10,6 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
-import java.util.regex.Pattern;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -30,6 +29,11 @@ import vn.mar.common.exception.BusinessException;
 import vn.mar.common.exception.ValidationException;
 import vn.mar.common.logging.LogContext;
 import vn.mar.common.time.TimeProvider;
+import vn.mar.lead.api.LeadNormalizationIssue;
+import vn.mar.lead.api.LeadNormalizationRequest;
+import vn.mar.lead.api.LeadNormalizationResult;
+import vn.mar.lead.api.LeadNormalizationService;
+import vn.mar.lead.model.LeadStatus;
 import vn.mar.leadimport.dto.request.LeadImportPreviewRequest;
 import vn.mar.leadimport.dto.response.LeadImportDuplicateCandidateResponse;
 import vn.mar.leadimport.dto.response.LeadImportPreviewResponse;
@@ -55,10 +59,6 @@ public class LeadImportPreviewService {
     private static final long MAX_CSV_BYTES = 1_048_576L;
     private static final int MAX_CSV_ROWS = 500;
     private static final int MAX_VALID_SAMPLES = 5;
-    private static final Pattern EMAIL_PATTERN = Pattern.compile(
-            "^[A-Z0-9._%+-]+@[A-Z0-9.-]+\\.[A-Z]{2,}$",
-            Pattern.CASE_INSENSITIVE
-    );
     private static final Set<String> ALLOWED_CONTENT_TYPES = Set.of(
             "text/csv",
             "application/csv",
@@ -74,6 +74,7 @@ public class LeadImportPreviewService {
     private final BranchRepository branchRepository;
     private final CsvLeadImportParser csvLeadImportParser;
     private final LeadImportMapper leadImportMapper;
+    private final LeadNormalizationService leadNormalizationService;
     private final CurrentUserContext currentUserContext;
     private final TimeProvider timeProvider;
     private final AuditService auditService;
@@ -86,6 +87,7 @@ public class LeadImportPreviewService {
             BranchRepository branchRepository,
             CsvLeadImportParser csvLeadImportParser,
             LeadImportMapper leadImportMapper,
+            LeadNormalizationService leadNormalizationService,
             CurrentUserContext currentUserContext,
             TimeProvider timeProvider,
             AuditService auditService) {
@@ -96,6 +98,7 @@ public class LeadImportPreviewService {
         this.branchRepository = branchRepository;
         this.csvLeadImportParser = csvLeadImportParser;
         this.leadImportMapper = leadImportMapper;
+        this.leadNormalizationService = leadNormalizationService;
         this.currentUserContext = currentUserContext;
         this.timeProvider = timeProvider;
         this.auditService = auditService;
@@ -259,6 +262,9 @@ public class LeadImportPreviewService {
             LeadRowPreview preview = new LeadRowPreview(row.rowNumber(), toRawRow(row));
             normalizeRow(preview, row, mappings, request);
             validateCatalogCodes(tenantId, preview, languageCache, programCache, branchCache);
+            if (!preview.errors.isEmpty()) {
+                preview.normalizedRow.put("lead_status", LeadStatus.INVALID.name());
+            }
             previews.add(preview);
         }
         return previews;
@@ -280,30 +286,17 @@ public class LeadImportPreviewService {
         String phoneRaw = rawValue(row, mappings.get(LeadImportField.PHONE));
         String emailRaw = rawValue(row, mappings.get(LeadImportField.EMAIL));
         String zaloRaw = rawValue(row, mappings.get(LeadImportField.ZALO_ID));
-        String normalizedPhone = normalizePhone(phoneRaw);
-        String normalizedEmail = normalizeEmail(emailRaw);
-        String normalizedZaloId = normalizeText(zaloRaw);
-
-        if (StringUtils.hasText(phoneRaw) && !isValidPhone(normalizedPhone)) {
-            preview.addError(LeadImportField.PHONE, "INVALID_PHONE", "Phone number format is invalid");
-        } else {
-            putIfText(preview.normalizedRow, LeadImportField.PHONE.code(), normalizedPhone);
-        }
-        if (StringUtils.hasText(emailRaw) && !isValidEmail(normalizedEmail)) {
-            preview.addError(LeadImportField.EMAIL, "INVALID_EMAIL", "Email format is invalid");
-        } else {
-            putIfText(preview.normalizedRow, LeadImportField.EMAIL.code(), normalizedEmail);
-        }
-        putIfText(preview.normalizedRow, LeadImportField.ZALO_ID.code(), normalizedZaloId);
-        if (!StringUtils.hasText((String) preview.normalizedRow.get(LeadImportField.PHONE.code()))
-                && !StringUtils.hasText((String) preview.normalizedRow.get(LeadImportField.EMAIL.code()))
-                && !StringUtils.hasText((String) preview.normalizedRow.get(LeadImportField.ZALO_ID.code()))) {
-            preview.errors.add(ErrorDetail.of(
-                    "rows[" + preview.rowNumber + "].contact_identifier",
-                    "CONTACT_IDENTIFIER_REQUIRED",
-                    "Lead must include phone, email, or Zalo ID"
-            ));
-        }
+        LeadNormalizationResult normalizedContact = leadNormalizationService.normalize(
+                new LeadNormalizationRequest(phoneRaw, emailRaw, zaloRaw)
+        );
+        putIfText(preview.normalizedRow, LeadImportField.PHONE.code(), normalizedContact.phoneNormalized());
+        putIfText(preview.normalizedRow, LeadImportField.EMAIL.code(), normalizedContact.email());
+        putIfText(preview.normalizedRow, LeadImportField.ZALO_ID.code(), normalizedContact.zaloId());
+        preview.normalizedRow.put("contactability", normalizedContact.contactability().name());
+        preview.normalizedRow.put("lead_status", normalizedContact.leadStatus().name());
+        normalizedContact.issues().stream()
+                .map(issue -> toRowError(preview.rowNumber, issue))
+                .forEach(preview.errors::add);
 
         putIfText(preview.normalizedRow, LeadImportField.SOURCE.code(),
                 firstText(rawValue(row, mappings.get(LeadImportField.SOURCE)), request.defaultSource()));
@@ -360,6 +353,7 @@ public class LeadImportPreviewService {
             DuplicateCandidate duplicate = findDuplicate(row, seen);
             if (duplicate != null) {
                 row.duplicateCandidate = duplicate;
+                row.normalizedRow.put("lead_status", LeadStatus.DUPLICATE_REVIEW.name());
                 row.errors.add(ErrorDetail.of(
                         "rows[" + row.rowNumber + "]." + duplicate.fieldCode,
                         "DUPLICATE_CANDIDATE",
@@ -539,35 +533,6 @@ public class LeadImportPreviewService {
         return separator >= 0 ? field.substring(separator + 1) : field;
     }
 
-    private String normalizePhone(String value) {
-        if (!StringUtils.hasText(value)) {
-            return null;
-        }
-        String digits = value.replaceAll("\\D", "");
-        if (digits.startsWith("84") && digits.length() == 11) {
-            return "0" + digits.substring(2);
-        }
-        return digits;
-    }
-
-    private boolean isValidPhone(String normalizedPhone) {
-        return StringUtils.hasText(normalizedPhone)
-                && normalizedPhone.length() >= 9
-                && normalizedPhone.length() <= 15;
-    }
-
-    private String normalizeEmail(String value) {
-        if (!StringUtils.hasText(value)) {
-            return null;
-        }
-        return value.trim().toLowerCase(Locale.ROOT);
-    }
-
-    private boolean isValidEmail(String normalizedEmail) {
-        return StringUtils.hasText(normalizedEmail)
-                && EMAIL_PATTERN.matcher(normalizedEmail).matches();
-    }
-
     private String normalizeText(String value) {
         return StringUtils.hasText(value) ? value.trim() : null;
     }
@@ -633,6 +598,14 @@ public class LeadImportPreviewService {
         return new ValidationException(
                 ErrorCode.VALIDATION_ERROR.defaultMessage(),
                 List.of(ErrorDetail.of(field, code, message))
+        );
+    }
+
+    private ErrorDetail toRowError(int rowNumber, LeadNormalizationIssue issue) {
+        return ErrorDetail.of(
+                "rows[" + rowNumber + "]." + issue.field().code(),
+                issue.code().name(),
+                issue.message()
         );
     }
 

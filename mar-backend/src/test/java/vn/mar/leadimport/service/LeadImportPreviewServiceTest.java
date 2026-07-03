@@ -33,6 +33,7 @@ import vn.mar.common.error.ErrorCode;
 import vn.mar.common.exception.BusinessException;
 import vn.mar.common.exception.ValidationException;
 import vn.mar.common.time.TimeProvider;
+import vn.mar.lead.service.DefaultLeadNormalizationService;
 import vn.mar.leadimport.dto.request.LeadImportPreviewRequest;
 import vn.mar.leadimport.dto.response.LeadImportPreviewResponse;
 import vn.mar.leadimport.entity.ImportBatch;
@@ -87,6 +88,7 @@ class LeadImportPreviewServiceTest {
                 branchRepository,
                 new CsvLeadImportParser(),
                 new LeadImportMapper(),
+                new DefaultLeadNormalizationService(),
                 currentUserContext,
                 timeProvider,
                 auditService
@@ -121,6 +123,8 @@ class LeadImportPreviewServiceTest {
         assertThat(response.duplicateCandidates().getFirst().rawValue()).isEqualTo("***001");
         assertThat(response.errorRows().getFirst().code()).isEqualTo("CONTACT_IDENTIFIER_REQUIRED");
         assertThat(response.validSamples().getFirst().normalizedRow()).containsEntry("phone", "***001");
+        assertThat(response.validSamples().getFirst().normalizedRow()).containsEntry("contactability", "HIGH");
+        assertThat(response.validSamples().getFirst().normalizedRow()).containsEntry("lead_status", "VALID");
 
         ArgumentCaptor<ImportBatch> batchCaptor = ArgumentCaptor.forClass(ImportBatch.class);
         verify(importBatchRepository).save(batchCaptor.capture());
@@ -132,6 +136,9 @@ class LeadImportPreviewServiceTest {
         List<ImportRow> savedRows = StreamSupport.stream(rowsCaptor.getValue().spliterator(), false).toList();
         assertThat(savedRows).extracting(ImportRow::rowStatus)
                 .containsExactly(ImportRowStatus.VALID, ImportRowStatus.ERROR, ImportRowStatus.DUPLICATE);
+        assertThat(savedRows.get(0).normalizedRow()).containsEntry("lead_status", "VALID");
+        assertThat(savedRows.get(1).normalizedRow()).containsEntry("lead_status", "INVALID");
+        assertThat(savedRows.get(2).normalizedRow()).containsEntry("lead_status", "DUPLICATE_REVIEW");
 
         ArgumentCaptor<AuditRecordCommand> auditCaptor = ArgumentCaptor.forClass(AuditRecordCommand.class);
         verify(auditService).record(auditCaptor.capture());
@@ -201,6 +208,23 @@ class LeadImportPreviewServiceTest {
         assertThat(response.validCount()).isZero();
         assertThat(response.errorCount()).isEqualTo(1);
         assertThat(response.errorRows().getFirst().code()).isEqualTo("INVALID_LANGUAGE_CODE");
+    }
+
+    @Test
+    void previewLeadImport_whenPhoneUsesCountryCode_shouldNormalizeBeforeDuplicateDetection() {
+        when(importBatchRepository.save(any(ImportBatch.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(importRowRepository.saveAll(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        LeadImportPreviewResponse response = leadImportPreviewService.previewLeadImport(validRequest(), csvFile("""
+                Full Name,Phone,Email
+                Local Format,0901234567,local@example.com
+                Country Code,+84 90 123 4567,country@example.com
+                """));
+
+        assertThat(response.validCount()).isEqualTo(1);
+        assertThat(response.duplicateCount()).isEqualTo(1);
+        assertThat(response.duplicateCandidates().getFirst().matchType()).isEqualTo("PHONE_EXACT");
+        assertThat(response.duplicateCandidates().getFirst().rawValue()).isEqualTo("***567");
     }
 
     @Test

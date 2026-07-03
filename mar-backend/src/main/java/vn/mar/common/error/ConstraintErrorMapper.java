@@ -39,7 +39,9 @@ public class ConstraintErrorMapper {
             Map.entry("ux_permission_profiles__tenant_role_function_scope", ErrorCode.INVALID_PERMISSION_GUARDRAIL),
             Map.entry("fk_permission_profiles__roles", ErrorCode.INVALID_PARENT_STATUS),
             Map.entry("fk_permission_profiles__permissions", ErrorCode.INVALID_PERMISSION_GUARDRAIL),
-            Map.entry("ck_permission_profiles__access_level", ErrorCode.INVALID_PERMISSION_GUARDRAIL)
+            Map.entry("ck_permission_profiles__access_level", ErrorCode.INVALID_PERMISSION_GUARDRAIL),
+            Map.entry("ux_customer_identities__tenant_customer_type_value", ErrorCode.DUPLICATE_RESOURCE),
+            Map.entry("ux_customer_identities__tenant_customer_type_primary", ErrorCode.DUPLICATE_RESOURCE)
     );
 
     public Optional<ErrorCode> map(String constraintName) {

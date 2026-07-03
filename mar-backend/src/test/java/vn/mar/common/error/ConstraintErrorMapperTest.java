@@ -72,6 +72,10 @@ class ConstraintErrorMapperTest {
                 .contains(ErrorCode.INVALID_PERMISSION_GUARDRAIL);
         assertThat(constraintErrorMapper.map("ck_permission_profiles__access_level"))
                 .contains(ErrorCode.INVALID_PERMISSION_GUARDRAIL);
+        assertThat(constraintErrorMapper.map("ux_customer_identities__tenant_customer_type_value"))
+                .contains(ErrorCode.DUPLICATE_RESOURCE);
+        assertThat(constraintErrorMapper.map("ux_customer_identities__tenant_customer_type_primary"))
+                .contains(ErrorCode.DUPLICATE_RESOURCE);
     }
 
     @Test

@@ -1,8 +1,7 @@
 package vn.mar.customer.api;
 
-import java.util.List;
 import java.util.UUID;
-import vn.mar.customer.model.DuplicateCaseStatus;
+import vn.mar.common.pagination.PageResponse;
 
 public interface DuplicateCaseManagementService {
 
@@ -12,7 +11,9 @@ public interface DuplicateCaseManagementService {
 
     DuplicateCaseSnapshot resolveCase(DuplicateCaseResolveCommand command);
 
+    DuplicateCaseSnapshot findCase(UUID duplicateCaseId);
+
     DuplicateCaseSnapshot findCase(UUID tenantId, UUID duplicateCaseId);
 
-    List<DuplicateCaseSnapshot> listCases(UUID tenantId, DuplicateCaseStatus status);
+    PageResponse<DuplicateCaseSnapshot> searchCases(DuplicateCaseSearchCommand command);
 }

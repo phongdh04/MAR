@@ -4,6 +4,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import org.springframework.stereotype.Component;
 import vn.mar.customer.api.DuplicateCaseSnapshot;
+import vn.mar.customer.dto.response.DuplicateCaseResponse;
 import vn.mar.customer.entity.DuplicateCase;
 
 @Component
@@ -25,6 +26,25 @@ public class DuplicateCaseMapper {
                 duplicateCase.resolutionReason(),
                 duplicateCase.createdAt(),
                 duplicateCase.updatedAt()
+        );
+    }
+
+    public DuplicateCaseResponse toResponse(DuplicateCaseSnapshot snapshot) {
+        return new DuplicateCaseResponse(
+                snapshot.duplicateCaseId(),
+                snapshot.tenantId(),
+                snapshot.sourceCustomerId(),
+                snapshot.matchedCustomerId(),
+                snapshot.matchType().name(),
+                snapshot.confidence().name(),
+                snapshot.status().name(),
+                snapshot.reviewReason(),
+                snapshot.resolutionAction() == null ? null : snapshot.resolutionAction().name(),
+                snapshot.resolvedBy(),
+                snapshot.resolvedAt(),
+                snapshot.resolutionReason(),
+                snapshot.createdAt(),
+                snapshot.updatedAt()
         );
     }
 

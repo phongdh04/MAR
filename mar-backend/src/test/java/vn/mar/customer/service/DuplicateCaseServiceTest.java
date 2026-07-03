@@ -70,6 +70,9 @@ class DuplicateCaseServiceTest {
     @Mock
     private CurrentUserContext currentUserContext;
 
+    @Mock
+    private CustomerMergeService customerMergeService;
+
     private DuplicateCaseService duplicateCaseService;
 
     @BeforeEach
@@ -81,7 +84,8 @@ class DuplicateCaseServiceTest {
                 new DuplicateCaseMapper(),
                 () -> NOW,
                 currentUserContext,
-                auditService
+                auditService,
+                customerMergeService
         );
     }
 
@@ -214,6 +218,7 @@ class DuplicateCaseServiceTest {
         assertThatThrownBy(() -> duplicateCaseService.resolveCase(new DuplicateCaseResolveCommand(
                 DUPLICATE_CASE_ID,
                 "MERGE",
+                MATCHED_CUSTOMER_ID,
                 " "
         )))
                 .isInstanceOf(ValidationException.class);
@@ -226,6 +231,7 @@ class DuplicateCaseServiceTest {
         assertThatThrownBy(() -> duplicateCaseService.resolveCase(new DuplicateCaseResolveCommand(
                 DUPLICATE_CASE_ID,
                 "MERGE",
+                MATCHED_CUSTOMER_ID,
                 "Confirmed same learner"
         )))
                 .isInstanceOf(BusinessException.class)
@@ -248,6 +254,7 @@ class DuplicateCaseServiceTest {
         DuplicateCaseSnapshot result = duplicateCaseService.resolveCase(new DuplicateCaseResolveCommand(
                 DUPLICATE_CASE_ID,
                 "MERGE",
+                MATCHED_CUSTOMER_ID,
                 "Confirmed same learner by parent"
         ));
 
@@ -259,6 +266,7 @@ class DuplicateCaseServiceTest {
         ArgumentCaptor<AuditRecordCommand> auditCaptor = ArgumentCaptor.forClass(AuditRecordCommand.class);
         verify(auditService).record(auditCaptor.capture());
         assertThat(auditCaptor.getValue().reason()).isEqualTo("Confirmed same learner by parent");
+        verify(customerMergeService).recordMerge(any(DuplicateCase.class), any(CustomerProfile.class), any(CustomerProfile.class), any(CurrentUser.class), any(String.class));
     }
 
     @Test
@@ -273,6 +281,7 @@ class DuplicateCaseServiceTest {
         DuplicateCaseSnapshot result = duplicateCaseService.resolveCase(new DuplicateCaseResolveCommand(
                 DUPLICATE_CASE_ID,
                 "IGNORE",
+                null,
                 "Different learners sharing guardian email"
         ));
 
@@ -289,6 +298,7 @@ class DuplicateCaseServiceTest {
         assertThatThrownBy(() -> duplicateCaseService.resolveCase(new DuplicateCaseResolveCommand(
                 DUPLICATE_CASE_ID,
                 "IGNORE",
+                null,
                 "Wrong case"
         )))
                 .isInstanceOf(BusinessException.class)
@@ -305,6 +315,7 @@ class DuplicateCaseServiceTest {
         assertThatThrownBy(() -> duplicateCaseService.resolveCase(new DuplicateCaseResolveCommand(
                 DUPLICATE_CASE_ID,
                 "MERGE",
+                MATCHED_CUSTOMER_ID,
                 "Confirmed same learner"
         )))
                 .isInstanceOf(BusinessException.class)

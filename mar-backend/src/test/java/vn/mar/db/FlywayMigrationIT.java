@@ -17,6 +17,7 @@ class FlywayMigrationIT {
 
     private static final String PRE_DUPLICATE_PERMISSION_TARGET = "20260703.03";
     private static final String DUPLICATE_PERMISSION_CODE = "duplicate.manage";
+    private static final String CUSTOMER_MERGE_PERMISSION_CODE = "customer.merge";
     private static final String EXISTING_TENANT_ID = "11111111-1111-1111-1111-111111111111";
 
     private static final List<String> FOUNDATION_TABLES = List.of(
@@ -34,6 +35,7 @@ class FlywayMigrationIT {
             "customer_profiles",
             "customer_identities",
             "duplicate_cases",
+            "merge_history",
             "import_batches",
             "import_rows"
     );
@@ -78,7 +80,9 @@ class FlywayMigrationIT {
                 assertThat(databaseObjectExists(connection, "ux_users__tenant_email")).isTrue();
                 assertThat(databaseObjectExists(connection, "ux_permission_profiles__tenant_role_function_scope")).isTrue();
                 assertThat(databaseObjectExists(connection, "ux_duplicate_cases__tenant_pair_type_open")).isTrue();
+                assertThat(databaseObjectExists(connection, "idx_merge_history__tenant_target")).isTrue();
                 assertThat(constraintExists(connection, "courses", "ck_courses__tuition_non_negative")).isTrue();
+                assertThat(constraintExists(connection, "merge_history", "ck_merge_history__customers_different")).isTrue();
                 assertThat(databaseObjectExists(connection, "idx_import_rows__tenant_batch_status")).isTrue();
                 assertThat(rowExists(connection, "roles", "role_code", "ADVISOR")).isTrue();
                 assertThat(rowExists(connection, "permissions", "function_code", "user.manage")).isTrue();
@@ -88,6 +92,7 @@ class FlywayMigrationIT {
                 assertThat(rowExists(connection, "permissions", "function_code", "duplicate.manage")).isTrue();
                 assertThat(permissionProfileExists(connection, EXISTING_TENANT_ID, "ADMIN", DUPLICATE_PERMISSION_CODE, "MANAGE", "TENANT")).isTrue();
                 assertThat(permissionProfileExists(connection, EXISTING_TENANT_ID, "SALES_LEAD", DUPLICATE_PERMISSION_CODE, "MANAGE", "BRANCH")).isTrue();
+                assertThat(permissionProfileExists(connection, EXISTING_TENANT_ID, "ADMIN", CUSTOMER_MERGE_PERMISSION_CODE, "MANAGE", "TENANT")).isTrue();
             }
         } finally {
             TimeZone.setDefault(originalTimeZone);

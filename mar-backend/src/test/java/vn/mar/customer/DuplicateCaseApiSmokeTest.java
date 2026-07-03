@@ -154,6 +154,17 @@ class DuplicateCaseApiSmokeTest {
     }
 
     @Test
+    void searchDuplicateCases_whenUnauthenticated_shouldReturnUnauthorizedEnvelope() throws Exception {
+        mockMvc.perform(get("/api/v1/duplicates")
+                        .header(RequestIdFilter.HEADER_NAME, "req_dup_007"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(header().string(RequestIdFilter.HEADER_NAME, "req_dup_007"))
+                .andExpect(jsonPath("$.error.code").value("UNAUTHENTICATED"))
+                .andExpect(jsonPath("$.error.message").value("Authentication is required"))
+                .andExpect(jsonPath("$.meta.request_id").value("req_dup_007"));
+    }
+
+    @Test
     void resolveDuplicateCase_whenMergeWithPermissions_shouldResolveAndAudit() throws Exception {
         when(permissionProfileRepository.findActivePermissionCodes(TENANT_ID, "ADMIN"))
                 .thenReturn(Set.of("duplicate.manage", "customer.merge"));
@@ -251,6 +262,38 @@ class DuplicateCaseApiSmokeTest {
                 .andExpect(jsonPath("$.error.code").value("VALIDATION_ERROR"))
                 .andExpect(jsonPath("$.error.details[0].field").value("size"))
                 .andExpect(jsonPath("$.meta.request_id").value("req_dup_006"));
+    }
+
+    @Test
+    void searchDuplicateCases_whenStatusInvalid_shouldReturnValidationEnvelope() throws Exception {
+        when(permissionProfileRepository.findActivePermissionCodes(TENANT_ID, "ADMIN"))
+                .thenReturn(Set.of("duplicate.manage"));
+
+        mockMvc.perform(get("/api/v1/duplicates")
+                        .queryParam("status", "DONE")
+                        .header(RequestIdFilter.HEADER_NAME, "req_dup_008")
+                        .header(HttpHeaders.AUTHORIZATION, bearerToken()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.code").value("VALIDATION_ERROR"))
+                .andExpect(jsonPath("$.error.details[0].field").value("status"))
+                .andExpect(jsonPath("$.error.details[0].code").value("INVALID_STATUS"))
+                .andExpect(jsonPath("$.meta.request_id").value("req_dup_008"));
+    }
+
+    @Test
+    void searchDuplicateCases_whenMatchTypeInvalid_shouldReturnValidationEnvelope() throws Exception {
+        when(permissionProfileRepository.findActivePermissionCodes(TENANT_ID, "ADMIN"))
+                .thenReturn(Set.of("duplicate.manage"));
+
+        mockMvc.perform(get("/api/v1/duplicates")
+                        .queryParam("match_type", "PHONE_EXACT")
+                        .header(RequestIdFilter.HEADER_NAME, "req_dup_009")
+                        .header(HttpHeaders.AUTHORIZATION, bearerToken()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.code").value("VALIDATION_ERROR"))
+                .andExpect(jsonPath("$.error.details[0].field").value("match_type"))
+                .andExpect(jsonPath("$.error.details[0].code").value("INVALID_MATCH_TYPE"))
+                .andExpect(jsonPath("$.meta.request_id").value("req_dup_009"));
     }
 
     private String bearerToken() {

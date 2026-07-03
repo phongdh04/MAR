@@ -25,6 +25,8 @@ public final class AuditActions {
     public static final String IMPORT_BATCH_CREATED = "IMPORT_BATCH_CREATED";
     public static final String DUPLICATE_CASE_CREATED = "DUPLICATE_CASE_CREATED";
     public static final String DUPLICATE_CASE_RESOLVED = "DUPLICATE_CASE_RESOLVED";
+    public static final String CUSTOMER_MERGED = "CUSTOMER_MERGED";
+    public static final String CUSTOMER_UNMERGED = "CUSTOMER_UNMERGED";
 
     private AuditActions() {
     }

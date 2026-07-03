@@ -20,6 +20,7 @@ public enum ErrorCode {
     IMPORT_BATCH_NOT_FOUND("IMPORT_BATCH_NOT_FOUND", HttpStatus.NOT_FOUND, "Import batch not found"),
     IMPORT_FILE_INVALID("IMPORT_FILE_INVALID", HttpStatus.BAD_REQUEST, "Import file is invalid"),
     IMPORT_ROW_VALIDATION_ERROR("IMPORT_ROW_VALIDATION_ERROR", HttpStatus.UNPROCESSABLE_ENTITY, "Import row validation failed"),
+    UNMERGE_NOT_ALLOWED("UNMERGE_NOT_ALLOWED", HttpStatus.UNPROCESSABLE_ENTITY, "Unmerge is not allowed"),
     BUSINESS_RULE_VIOLATION("BUSINESS_RULE_VIOLATION", HttpStatus.UNPROCESSABLE_ENTITY, "Business rule violation"),
     INTERNAL_ERROR("INTERNAL_ERROR", HttpStatus.INTERNAL_SERVER_ERROR, "Internal server error");
 

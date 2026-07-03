@@ -4,5 +4,6 @@ public enum DuplicateCaseStatus {
     NEEDS_REVIEW,
     MERGED,
     LINKED,
-    IGNORED
+    IGNORED,
+    UNMERGED
 }

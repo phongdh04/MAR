@@ -171,6 +171,11 @@ public class DuplicateCase {
         this.updatedAt = now;
     }
 
+    public void markUnmerged(Instant now) {
+        this.status = DuplicateCaseStatus.UNMERGED;
+        this.updatedAt = now;
+    }
+
     public UUID id() {
         return id;
     }

@@ -11,6 +11,8 @@ public final class AuditResourceTypes {
     public static final String COURSE = "COURSE";
     public static final String IMPORT_BATCH = "IMPORT_BATCH";
     public static final String DUPLICATE_CASE = "DUPLICATE_CASE";
+    public static final String CUSTOMER_PROFILE = "CUSTOMER_PROFILE";
+    public static final String MERGE_HISTORY = "MERGE_HISTORY";
 
     private AuditResourceTypes() {
     }

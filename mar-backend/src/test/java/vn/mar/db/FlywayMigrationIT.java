@@ -23,6 +23,8 @@ class FlywayMigrationIT {
     private static final String ACTIVITY_CREATE_PERMISSION_CODE = "activity.create";
     private static final String SLA_VIEW_PERMISSION_CODE = "sla.view";
     private static final String SLA_MANAGE_PERMISSION_CODE = "sla.manage";
+    private static final String SLA_TASK_VIEW_PERMISSION_CODE = "sla.task.view";
+    private static final String SLA_TASK_MANAGE_PERMISSION_CODE = "sla.task.manage";
     private static final String ASSIGNMENT_VIEW_PERMISSION_CODE = "assignment.view";
     private static final String ASSIGNMENT_MANAGE_PERMISSION_CODE = "assignment.manage";
     private static final String EXISTING_TENANT_ID = "11111111-1111-1111-1111-111111111111";
@@ -50,6 +52,7 @@ class FlywayMigrationIT {
             "activities",
             "working_hours_configs",
             "sla_policies",
+            "sla_tasks",
             "assignment_rules",
             "assignment_rule_advisors",
             "assignment_pool_states",
@@ -108,6 +111,8 @@ class FlywayMigrationIT {
                 assertThat(databaseObjectExists(connection, "ux_assignment_rule_advisors__rule_advisor_active")).isTrue();
                 assertThat(databaseObjectExists(connection, "ux_assignment_pool_states__tenant_rule")).isTrue();
                 assertThat(databaseObjectExists(connection, "ux_unassigned_assignment_items__opportunity_open")).isTrue();
+                assertThat(databaseObjectExists(connection, "ux_sla_tasks__opportunity_type_active")).isTrue();
+                assertThat(databaseObjectExists(connection, "idx_sla_tasks__tenant_owner_status_due")).isTrue();
                 assertThat(constraintExists(connection, "courses", "ck_courses__tuition_non_negative")).isTrue();
                 assertThat(constraintExists(connection, "merge_history", "ck_merge_history__customers_different")).isTrue();
                 assertThat(constraintExists(connection, "admission_opportunities", "ck_admission_opportunities__lost_note_required")).isTrue();
@@ -118,6 +123,7 @@ class FlywayMigrationIT {
                 assertThat(constraintExists(connection, "assignment_rules", "ck_assignment_rules__strategy")).isTrue();
                 assertThat(constraintExists(connection, "assignment_histories", "ck_assignment_histories__source")).isTrue();
                 assertThat(constraintExists(connection, "unassigned_assignment_items", "ck_unassigned_assignment_items__reason")).isTrue();
+                assertThat(constraintExists(connection, "sla_tasks", "ck_sla_tasks__completion_state")).isTrue();
                 assertThat(databaseObjectExists(connection, "idx_import_rows__tenant_batch_status")).isTrue();
                 assertThat(rowExists(connection, "roles", "role_code", "ADVISOR")).isTrue();
                 assertThat(rowExists(connection, "permissions", "function_code", "user.manage")).isTrue();
@@ -129,6 +135,8 @@ class FlywayMigrationIT {
                 assertThat(rowExists(connection, "permissions", "function_code", ACTIVITY_CREATE_PERMISSION_CODE)).isTrue();
                 assertThat(rowExists(connection, "permissions", "function_code", SLA_VIEW_PERMISSION_CODE)).isTrue();
                 assertThat(rowExists(connection, "permissions", "function_code", SLA_MANAGE_PERMISSION_CODE)).isTrue();
+                assertThat(rowExists(connection, "permissions", "function_code", SLA_TASK_VIEW_PERMISSION_CODE)).isTrue();
+                assertThat(rowExists(connection, "permissions", "function_code", SLA_TASK_MANAGE_PERMISSION_CODE)).isTrue();
                 assertThat(rowExists(connection, "permissions", "function_code", ASSIGNMENT_VIEW_PERMISSION_CODE)).isTrue();
                 assertThat(rowExists(connection, "permissions", "function_code", ASSIGNMENT_MANAGE_PERMISSION_CODE)).isTrue();
                 assertThat(rowExistsForTenant(connection, "working_hours_configs", EXISTING_TENANT_ID, "weekday", "MONDAY")).isTrue();
@@ -142,6 +150,8 @@ class FlywayMigrationIT {
                 assertThat(permissionProfileExists(connection, EXISTING_TENANT_ID, "ADVISOR", ACTIVITY_CREATE_PERMISSION_CODE, "CREATE", "OWN")).isTrue();
                 assertThat(permissionProfileExists(connection, EXISTING_TENANT_ID, "ADMIN", SLA_MANAGE_PERMISSION_CODE, "MANAGE", "TENANT")).isTrue();
                 assertThat(permissionProfileExists(connection, EXISTING_TENANT_ID, "SALES_LEAD", SLA_MANAGE_PERMISSION_CODE, "MANAGE", "BRANCH")).isTrue();
+                assertThat(permissionProfileExists(connection, EXISTING_TENANT_ID, "ADVISOR", SLA_TASK_VIEW_PERMISSION_CODE, "VIEW", "OWN")).isTrue();
+                assertThat(permissionProfileExists(connection, EXISTING_TENANT_ID, "SALES_LEAD", SLA_TASK_MANAGE_PERMISSION_CODE, "MANAGE", "BRANCH")).isTrue();
                 assertThat(permissionProfileExists(connection, EXISTING_TENANT_ID, "ADMIN", ASSIGNMENT_MANAGE_PERMISSION_CODE, "MANAGE", "TENANT")).isTrue();
                 assertThat(permissionProfileExists(connection, EXISTING_TENANT_ID, "SALES_LEAD", ASSIGNMENT_MANAGE_PERMISSION_CODE, "MANAGE", "BRANCH")).isTrue();
             }

@@ -20,6 +20,7 @@ public final class AuditResourceTypes {
     public static final String ACTIVITY = "ACTIVITY";
     public static final String WORKING_HOURS_CONFIG = "WORKING_HOURS_CONFIG";
     public static final String SLA_POLICY = "SLA_POLICY";
+    public static final String SLA_TASK = "SLA_TASK";
     public static final String ASSIGNMENT_RULE = "ASSIGNMENT_RULE";
     public static final String UNASSIGNED_ASSIGNMENT_ITEM = "UNASSIGNED_ASSIGNMENT_ITEM";
 

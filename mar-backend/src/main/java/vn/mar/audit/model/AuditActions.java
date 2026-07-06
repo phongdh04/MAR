@@ -35,6 +35,11 @@ public final class AuditActions {
     public static final String ACTIVITY_CREATED = "ACTIVITY_CREATED";
     public static final String WORKING_HOURS_UPDATED = "WORKING_HOURS_UPDATED";
     public static final String SLA_POLICY_UPDATED = "SLA_POLICY_UPDATED";
+    public static final String SLA_TASK_CREATED = "SLA_TASK_CREATED";
+    public static final String SLA_TASK_REFRESHED = "SLA_TASK_REFRESHED";
+    public static final String SLA_TASK_COMPLETED = "SLA_TASK_COMPLETED";
+    public static final String SLA_TASK_OVERDUE_MARKED = "SLA_TASK_OVERDUE_MARKED";
+    public static final String SLA_TASK_ESCALATED_TO_SALES_LEAD = "SLA_TASK_ESCALATED_TO_SALES_LEAD";
     public static final String ASSIGNMENT_RULE_CREATED = "ASSIGNMENT_RULE_CREATED";
     public static final String ASSIGNMENT_RULE_UPDATED = "ASSIGNMENT_RULE_UPDATED";
     public static final String OPPORTUNITY_ASSIGNED = "OPPORTUNITY_ASSIGNED";

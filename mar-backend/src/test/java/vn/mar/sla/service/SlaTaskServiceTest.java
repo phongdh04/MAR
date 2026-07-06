@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -150,6 +151,37 @@ class SlaTaskServiceTest {
     }
 
     @Test
+    void completeFirstResponseTask_whenActivityAfterDueAt_shouldCompleteAndRecordSlaMiss() {
+        SlaTask task = openTask(NOW.minusSeconds(60));
+        when(slaTaskRepository.findFirstByTenantIdAndOpportunityIdAndTaskTypeAndStatusInOrderByCreatedAtDescIdDesc(
+                eq(TENANT_ID),
+                eq(OPPORTUNITY_ID),
+                eq(SlaTaskType.FIRST_RESPONSE),
+                any()
+        )).thenReturn(Optional.of(task));
+        when(slaTaskRepository.save(any(SlaTask.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        Optional<SlaTaskSnapshot> completed = slaTaskService.completeFirstResponseTask(new CompleteFirstResponseSlaTaskCommand(
+                TENANT_ID,
+                OPPORTUNITY_ID,
+                ACTIVITY_ID,
+                NOW,
+                ACTOR_ID,
+                "ADVISOR"
+        ));
+
+        assertThat(completed).isPresent();
+        assertThat(completed.get().status()).isEqualTo(SlaTaskStatus.COMPLETED.name());
+        assertThat(completed.get().slaHit()).isFalse();
+        assertThat(completed.get().completedAt()).isEqualTo(NOW);
+
+        ArgumentCaptor<AuditRecordCommand> auditCaptor = ArgumentCaptor.forClass(AuditRecordCommand.class);
+        verify(auditService).record(auditCaptor.capture());
+        assertThat(auditCaptor.getValue().action()).isEqualTo(AuditActions.SLA_TASK_COMPLETED);
+        assertThat(auditCaptor.getValue().reason()).isEqualTo("First response SLA completed after due time");
+    }
+
+    @Test
     void scanOverdueTasks_whenOpenAndAdvisorOverdueTasksExist_shouldMarkAndEscalateIdempotently() {
         allowAdmin(PermissionCodes.SLA_TASK_MANAGE);
         SlaTask openDueTask = openTask(NOW.minusSeconds(60));
@@ -175,6 +207,15 @@ class SlaTaskServiceTest {
         assertThat(openDueTask.status()).isEqualTo(SlaTaskStatus.OVERDUE);
         assertThat(openDueTask.overdueLevel()).isEqualTo(SlaOverdueLevel.ADVISOR);
         assertThat(advisorOverdueTask.overdueLevel()).isEqualTo(SlaOverdueLevel.SALES_LEAD);
+
+        ArgumentCaptor<AuditRecordCommand> auditCaptor = ArgumentCaptor.forClass(AuditRecordCommand.class);
+        verify(auditService, times(2)).record(auditCaptor.capture());
+        assertThat(auditCaptor.getAllValues())
+                .extracting(AuditRecordCommand::action)
+                .containsExactly(
+                        AuditActions.SLA_TASK_ESCALATED_TO_SALES_LEAD,
+                        AuditActions.SLA_TASK_OVERDUE_MARKED
+                );
     }
 
     @Test

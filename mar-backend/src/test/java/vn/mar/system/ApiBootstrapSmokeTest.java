@@ -24,8 +24,11 @@ import vn.mar.customer.repository.CustomerIdentityRepository;
 import vn.mar.customer.repository.CustomerProfileRepository;
 import vn.mar.customer.repository.DuplicateCaseRepository;
 import vn.mar.customer.repository.MergeHistoryRepository;
+import vn.mar.lead.repository.LeadRepository;
 import vn.mar.leadimport.repository.ImportBatchRepository;
 import vn.mar.leadimport.repository.ImportRowRepository;
+import vn.mar.opportunity.repository.AdmissionOpportunityRepository;
+import vn.mar.opportunity.repository.TouchpointRepository;
 import vn.mar.role.repository.RoleRepository;
 import vn.mar.tenant.repository.TenantRepository;
 import vn.mar.user.repository.UserRepository;
@@ -80,6 +83,15 @@ class ApiBootstrapSmokeTest {
 
     @MockitoBean
     private AuditEventRepository auditEventRepository;
+
+    @MockitoBean
+    private LeadRepository leadRepository;
+
+    @MockitoBean
+    private AdmissionOpportunityRepository admissionOpportunityRepository;
+
+    @MockitoBean
+    private TouchpointRepository touchpointRepository;
 
     @MockitoBean
     private RoleRepository roleRepository;

@@ -1,0 +1,243 @@
+package vn.mar.opportunity;
+
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+import java.time.Instant;
+import java.util.List;
+import java.util.Optional;
+import java.util.Set;
+import java.util.UUID;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.web.servlet.MockMvc;
+import vn.mar.MarApplication;
+import vn.mar.audit.entity.AuditEvent;
+import vn.mar.audit.repository.AuditEventRepository;
+import vn.mar.authz.repository.PermissionProfileRepository;
+import vn.mar.branch.repository.BranchRepository;
+import vn.mar.catalog.repository.CourseRepository;
+import vn.mar.catalog.repository.LanguageRepository;
+import vn.mar.catalog.repository.ProgramRepository;
+import vn.mar.common.cache.CacheEvictionService;
+import vn.mar.common.logging.RequestIdFilter;
+import vn.mar.customer.repository.CustomerIdentityRepository;
+import vn.mar.customer.repository.CustomerProfileRepository;
+import vn.mar.customer.repository.DuplicateCaseRepository;
+import vn.mar.customer.repository.MergeHistoryRepository;
+import vn.mar.lead.repository.LeadRepository;
+import vn.mar.leadimport.repository.ImportBatchRepository;
+import vn.mar.leadimport.repository.ImportRowRepository;
+import vn.mar.opportunity.entity.AdmissionOpportunity;
+import vn.mar.opportunity.model.OpportunityStage;
+import vn.mar.opportunity.repository.AdmissionOpportunityRepository;
+import vn.mar.opportunity.repository.TouchpointRepository;
+import vn.mar.role.repository.RoleRepository;
+import vn.mar.security.jwt.JwtTokenProvider;
+import vn.mar.tenant.repository.TenantRepository;
+import vn.mar.user.repository.UserRepository;
+import vn.mar.userbranch.repository.UserBranchRepository;
+
+@SpringBootTest(classes = MarApplication.class)
+@AutoConfigureMockMvc
+@ActiveProfiles("test")
+class OpportunityApiSmokeTest {
+
+    private static final UUID ACTOR_ID = UUID.fromString("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
+    private static final UUID TENANT_ID = UUID.fromString("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb");
+    private static final UUID CUSTOMER_ID = UUID.fromString("cccccccc-cccc-cccc-cccc-cccccccccccc");
+    private static final UUID LEAD_ID = UUID.fromString("dddddddd-dddd-dddd-dddd-dddddddddddd");
+    private static final UUID OPPORTUNITY_ID = UUID.fromString("eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee");
+    private static final UUID LANGUAGE_ID = UUID.fromString("11111111-1111-1111-1111-111111111111");
+    private static final UUID PROGRAM_ID = UUID.fromString("22222222-2222-2222-2222-222222222222");
+    private static final Instant NOW = Instant.parse("2026-07-06T01:00:00Z");
+
+    @Autowired
+    private MockMvc mockMvc;
+
+    @Autowired
+    private JwtTokenProvider jwtTokenProvider;
+
+    @Autowired
+    private CacheEvictionService cacheEvictionService;
+
+    @MockitoBean
+    private UserRepository userRepository;
+
+    @MockitoBean
+    private UserBranchRepository userBranchRepository;
+
+    @MockitoBean
+    private RoleRepository roleRepository;
+
+    @MockitoBean
+    private PermissionProfileRepository permissionProfileRepository;
+
+    @MockitoBean
+    private TenantRepository tenantRepository;
+
+    @MockitoBean
+    private BranchRepository branchRepository;
+
+    @MockitoBean
+    private LanguageRepository languageRepository;
+
+    @MockitoBean
+    private ProgramRepository programRepository;
+
+    @MockitoBean
+    private CourseRepository courseRepository;
+
+    @MockitoBean
+    private CustomerProfileRepository customerProfileRepository;
+
+    @MockitoBean
+    private CustomerIdentityRepository customerIdentityRepository;
+
+    @MockitoBean
+    private DuplicateCaseRepository duplicateCaseRepository;
+
+    @MockitoBean
+    private MergeHistoryRepository mergeHistoryRepository;
+
+    @MockitoBean
+    private LeadRepository leadRepository;
+
+    @MockitoBean
+    private AdmissionOpportunityRepository admissionOpportunityRepository;
+
+    @MockitoBean
+    private TouchpointRepository touchpointRepository;
+
+    @MockitoBean
+    private ImportBatchRepository importBatchRepository;
+
+    @MockitoBean
+    private ImportRowRepository importRowRepository;
+
+    @MockitoBean
+    private AuditEventRepository auditEventRepository;
+
+    @BeforeEach
+    void setUp() {
+        cacheEvictionService.clearPermissionProfiles();
+        when(admissionOpportunityRepository.save(any(AdmissionOpportunity.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(auditEventRepository.save(any(AuditEvent.class))).thenAnswer(invocation -> invocation.getArgument(0));
+    }
+
+    @Test
+    void searchOpportunities_whenLeadViewPermission_shouldReturnPaginatedEnvelope() throws Exception {
+        when(permissionProfileRepository.findActivePermissionCodes(TENANT_ID, "ADMIN"))
+                .thenReturn(Set.of("lead.view"));
+        when(admissionOpportunityRepository.search(
+                eq(TENANT_ID),
+                eq(null),
+                eq(OpportunityStage.NEW),
+                eq(LANGUAGE_ID),
+                eq(PROGRAM_ID),
+                any(Pageable.class)
+        )).thenReturn(new PageImpl<>(List.of(opportunity()), PageRequest.of(0, 20), 1));
+
+        mockMvc.perform(get("/api/v1/opportunities")
+                        .queryParam("stage", "NEW")
+                        .queryParam("language_id", LANGUAGE_ID.toString())
+                        .queryParam("program_id", PROGRAM_ID.toString())
+                        .header(RequestIdFilter.HEADER_NAME, "req_opp_001")
+                        .header(HttpHeaders.AUTHORIZATION, bearerToken()))
+                .andExpect(status().isOk())
+                .andExpect(header().string(RequestIdFilter.HEADER_NAME, "req_opp_001"))
+                .andExpect(jsonPath("$.data.items[0].opportunity_id").value(OPPORTUNITY_ID.toString()))
+                .andExpect(jsonPath("$.data.items[0].customer_id").value(CUSTOMER_ID.toString()))
+                .andExpect(jsonPath("$.data.items[0].current_stage").value("NEW"))
+                .andExpect(jsonPath("$.data.total_elements").value(1))
+                .andExpect(jsonPath("$.meta.request_id").value("req_opp_001"));
+    }
+
+    @Test
+    void updateOpportunity_whenOpportunityUpdatePermission_shouldReturnUpdatedEnvelope() throws Exception {
+        when(permissionProfileRepository.findActivePermissionCodes(TENANT_ID, "ADMIN"))
+                .thenReturn(Set.of("opportunity.update"));
+        when(admissionOpportunityRepository.findByIdAndTenantId(OPPORTUNITY_ID, TENANT_ID))
+                .thenReturn(Optional.of(opportunity()));
+
+        mockMvc.perform(patch("/api/v1/opportunities/{opportunityId}", OPPORTUNITY_ID)
+                        .header(RequestIdFilter.HEADER_NAME, "req_opp_002")
+                        .header(HttpHeaders.AUTHORIZATION, bearerToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "qualification_status": "QUALIFIED",
+                                  "note": "Qualified after advisor review"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.opportunity_id").value(OPPORTUNITY_ID.toString()))
+                .andExpect(jsonPath("$.data.qualification_status").value("QUALIFIED"))
+                .andExpect(jsonPath("$.meta.request_id").value("req_opp_002"));
+    }
+
+    @Test
+    void updateOpportunity_whenPermissionMissing_shouldReturnForbiddenEnvelope() throws Exception {
+        when(permissionProfileRepository.findActivePermissionCodes(TENANT_ID, "ADMIN"))
+                .thenReturn(Set.of("lead.view"));
+
+        mockMvc.perform(patch("/api/v1/opportunities/{opportunityId}", OPPORTUNITY_ID)
+                        .header(RequestIdFilter.HEADER_NAME, "req_opp_003")
+                        .header(HttpHeaders.AUTHORIZATION, bearerToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "qualification_status": "QUALIFIED"
+                                }
+                                """))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.error.code").value("PERMISSION_DENIED"))
+                .andExpect(jsonPath("$.meta.request_id").value("req_opp_003"));
+    }
+
+    @Test
+    void searchOpportunities_whenUnauthenticated_shouldReturnUnauthorizedEnvelope() throws Exception {
+        mockMvc.perform(get("/api/v1/opportunities")
+                        .header(RequestIdFilter.HEADER_NAME, "req_opp_004"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(header().string(RequestIdFilter.HEADER_NAME, "req_opp_004"))
+                .andExpect(jsonPath("$.error.code").value("UNAUTHENTICATED"))
+                .andExpect(jsonPath("$.meta.request_id").value("req_opp_004"));
+    }
+
+    private String bearerToken() {
+        return "Bearer " + jwtTokenProvider.createAccessToken(ACTOR_ID, TENANT_ID, "ADMIN").token();
+    }
+
+    private AdmissionOpportunity opportunity() {
+        return AdmissionOpportunity.create(
+                OPPORTUNITY_ID,
+                TENANT_ID,
+                CUSTOMER_ID,
+                LEAD_ID,
+                LANGUAGE_ID,
+                PROGRAM_ID,
+                null,
+                null,
+                ACTOR_ID,
+                null,
+                NOW
+        );
+    }
+}

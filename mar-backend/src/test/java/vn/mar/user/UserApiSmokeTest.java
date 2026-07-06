@@ -52,8 +52,11 @@ import vn.mar.customer.repository.CustomerIdentityRepository;
 import vn.mar.customer.repository.CustomerProfileRepository;
 import vn.mar.customer.repository.DuplicateCaseRepository;
 import vn.mar.customer.repository.MergeHistoryRepository;
+import vn.mar.lead.repository.LeadRepository;
 import vn.mar.leadimport.repository.ImportBatchRepository;
 import vn.mar.leadimport.repository.ImportRowRepository;
+import vn.mar.opportunity.repository.AdmissionOpportunityRepository;
+import vn.mar.opportunity.repository.TouchpointRepository;
 import vn.mar.role.model.RoleStatus;
 import vn.mar.role.repository.RoleRepository;
 import vn.mar.security.jwt.JwtTokenProvider;
@@ -133,6 +136,15 @@ class UserApiSmokeTest {
 
     @MockitoBean
     private MergeHistoryRepository mergeHistoryRepository;
+
+    @MockitoBean
+    private LeadRepository leadRepository;
+
+    @MockitoBean
+    private AdmissionOpportunityRepository admissionOpportunityRepository;
+
+    @MockitoBean
+    private TouchpointRepository touchpointRepository;
 
     @BeforeEach
     void setUp() {

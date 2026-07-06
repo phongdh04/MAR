@@ -42,13 +42,18 @@ import vn.mar.lead.model.LeadTemperature;
 import vn.mar.lead.repository.LeadRepository;
 import vn.mar.opportunity.api.AdmissionOpportunitySearchCommand;
 import vn.mar.opportunity.api.AdmissionOpportunitySnapshot;
+import vn.mar.opportunity.api.ChangeOpportunityStageCommand;
+import vn.mar.opportunity.api.StageChangeSnapshot;
 import vn.mar.opportunity.api.CreateAdmissionOpportunityCommand;
 import vn.mar.opportunity.entity.AdmissionOpportunity;
+import vn.mar.opportunity.entity.StageHistory;
 import vn.mar.opportunity.entity.Touchpoint;
 import vn.mar.opportunity.mapper.AdmissionOpportunityMapper;
+import vn.mar.opportunity.model.LostReason;
 import vn.mar.opportunity.model.OpportunityStage;
 import vn.mar.opportunity.model.TouchpointType;
 import vn.mar.opportunity.repository.AdmissionOpportunityRepository;
+import vn.mar.opportunity.repository.StageHistoryRepository;
 import vn.mar.opportunity.repository.TouchpointRepository;
 import vn.mar.security.context.CurrentUser;
 import vn.mar.security.context.CurrentUserContext;
@@ -77,6 +82,9 @@ class AdmissionOpportunityServiceTest {
 
     @Mock
     private TouchpointRepository touchpointRepository;
+
+    @Mock
+    private StageHistoryRepository stageHistoryRepository;
 
     @Mock
     private LeadRepository leadRepository;
@@ -113,6 +121,7 @@ class AdmissionOpportunityServiceTest {
         admissionOpportunityService = new AdmissionOpportunityService(
                 admissionOpportunityRepository,
                 touchpointRepository,
+                stageHistoryRepository,
                 leadRepository,
                 customerProfileRepository,
                 languageRepository,
@@ -233,6 +242,167 @@ class AdmissionOpportunityServiceTest {
                 .isInstanceOf(BusinessException.class)
                 .extracting("errorCode")
                 .isEqualTo(ErrorCode.PERMISSION_DENIED);
+    }
+
+    @Test
+    void changeStage_whenNewToContacting_shouldUpdateOpportunityAppendHistoryAndAudit() {
+        allowAdmin("opportunity.update");
+        when(admissionOpportunityRepository.findByIdAndTenantId(OPPORTUNITY_ID, TENANT_ID))
+                .thenReturn(Optional.of(opportunity(OPPORTUNITY_ID, LEAD_ID, ACTOR_ID)));
+        when(stageHistoryRepository.findFirstByTenantIdAndOpportunityIdOrderByChangedAtDesc(TENANT_ID, OPPORTUNITY_ID))
+                .thenReturn(Optional.empty());
+        when(stageHistoryRepository.save(any(StageHistory.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(admissionOpportunityRepository.save(any(AdmissionOpportunity.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        StageChangeSnapshot snapshot = admissionOpportunityService.changeStage(new ChangeOpportunityStageCommand(
+                OPPORTUNITY_ID,
+                "CONTACTING",
+                null,
+                null,
+                "Advisor started first handling"
+        ));
+
+        assertThat(snapshot.opportunityId()).isEqualTo(OPPORTUNITY_ID);
+        assertThat(snapshot.fromStage()).isEqualTo("NEW");
+        assertThat(snapshot.toStage()).isEqualTo("CONTACTING");
+        assertThat(snapshot.stageHistoryId()).isNotNull();
+        ArgumentCaptor<StageHistory> historyCaptor = ArgumentCaptor.forClass(StageHistory.class);
+        verify(stageHistoryRepository).save(historyCaptor.capture());
+        assertThat(historyCaptor.getValue().fromStage()).isEqualTo(OpportunityStage.NEW);
+        assertThat(historyCaptor.getValue().toStage()).isEqualTo(OpportunityStage.CONTACTING);
+        ArgumentCaptor<AdmissionOpportunity> opportunityCaptor = ArgumentCaptor.forClass(AdmissionOpportunity.class);
+        verify(admissionOpportunityRepository).save(opportunityCaptor.capture());
+        assertThat(opportunityCaptor.getValue().currentStage()).isEqualTo(OpportunityStage.CONTACTING);
+        ArgumentCaptor<AuditRecordCommand> auditCaptor = ArgumentCaptor.forClass(AuditRecordCommand.class);
+        verify(auditService).record(auditCaptor.capture());
+        assertThat(auditCaptor.getValue().action()).isEqualTo(AuditActions.OPPORTUNITY_STAGE_CHANGED);
+    }
+
+    @Test
+    void changeStage_whenTransitionIsNotAllowed_shouldReject() {
+        allowAdmin("opportunity.update");
+        when(admissionOpportunityRepository.findByIdAndTenantId(OPPORTUNITY_ID, TENANT_ID))
+                .thenReturn(Optional.of(opportunity(OPPORTUNITY_ID, LEAD_ID, ACTOR_ID)));
+
+        assertThatThrownBy(() -> admissionOpportunityService.changeStage(new ChangeOpportunityStageCommand(
+                OPPORTUNITY_ID,
+                "ENROLLED",
+                null,
+                null,
+                null
+        )))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.INVALID_STAGE_TRANSITION);
+    }
+
+    @Test
+    void changeStage_whenLostReasonMissing_shouldReject() {
+        allowAdmin("opportunity.update");
+        AdmissionOpportunity opportunity = opportunity(OPPORTUNITY_ID, LEAD_ID, ACTOR_ID);
+        opportunity.changeStage(OpportunityStage.CONTACTED, null, null, NOW);
+        when(admissionOpportunityRepository.findByIdAndTenantId(OPPORTUNITY_ID, TENANT_ID))
+                .thenReturn(Optional.of(opportunity));
+
+        assertThatThrownBy(() -> admissionOpportunityService.changeStage(new ChangeOpportunityStageCommand(
+                OPPORTUNITY_ID,
+                "LOST",
+                null,
+                null,
+                null
+        )))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.LOST_REASON_REQUIRED);
+    }
+
+    @Test
+    void changeStage_whenLostReasonOtherWithoutNote_shouldReject() {
+        allowAdmin("opportunity.update");
+        AdmissionOpportunity opportunity = opportunity(OPPORTUNITY_ID, LEAD_ID, ACTOR_ID);
+        opportunity.changeStage(OpportunityStage.CONTACTED, null, null, NOW);
+        when(admissionOpportunityRepository.findByIdAndTenantId(OPPORTUNITY_ID, TENANT_ID))
+                .thenReturn(Optional.of(opportunity));
+
+        assertThatThrownBy(() -> admissionOpportunityService.changeStage(new ChangeOpportunityStageCommand(
+                OPPORTUNITY_ID,
+                "LOST",
+                "OTHER",
+                null,
+                null
+        )))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.LOST_REASON_REQUIRED);
+    }
+
+    @Test
+    void changeStage_whenContactedToLostWithOtherReasonAndNote_shouldPersistLostFields() {
+        allowAdmin("opportunity.update");
+        AdmissionOpportunity opportunity = opportunity(OPPORTUNITY_ID, LEAD_ID, ACTOR_ID);
+        opportunity.changeStage(OpportunityStage.CONTACTED, null, null, NOW);
+        when(admissionOpportunityRepository.findByIdAndTenantId(OPPORTUNITY_ID, TENANT_ID))
+                .thenReturn(Optional.of(opportunity));
+        when(stageHistoryRepository.findFirstByTenantIdAndOpportunityIdOrderByChangedAtDesc(TENANT_ID, OPPORTUNITY_ID))
+                .thenReturn(Optional.empty());
+        when(stageHistoryRepository.save(any(StageHistory.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(admissionOpportunityRepository.save(any(AdmissionOpportunity.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        StageChangeSnapshot snapshot = admissionOpportunityService.changeStage(new ChangeOpportunityStageCommand(
+                OPPORTUNITY_ID,
+                "LOST",
+                "OTHER",
+                "Customer has a non-standard budget objection",
+                "Customer cannot commit now"
+        ));
+
+        assertThat(snapshot.fromStage()).isEqualTo("CONTACTED");
+        assertThat(snapshot.toStage()).isEqualTo("LOST");
+        ArgumentCaptor<AdmissionOpportunity> opportunityCaptor = ArgumentCaptor.forClass(AdmissionOpportunity.class);
+        verify(admissionOpportunityRepository).save(opportunityCaptor.capture());
+        assertThat(opportunityCaptor.getValue().currentStage()).isEqualTo(OpportunityStage.LOST);
+        assertThat(opportunityCaptor.getValue().lostReason()).isEqualTo(LostReason.OTHER);
+        assertThat(opportunityCaptor.getValue().lostNote()).isEqualTo("Customer has a non-standard budget objection");
+        ArgumentCaptor<StageHistory> historyCaptor = ArgumentCaptor.forClass(StageHistory.class);
+        verify(stageHistoryRepository).save(historyCaptor.capture());
+        assertThat(historyCaptor.getValue().fromStage()).isEqualTo(OpportunityStage.CONTACTED);
+        assertThat(historyCaptor.getValue().toStage()).isEqualTo(OpportunityStage.LOST);
+        assertThat(historyCaptor.getValue().reason()).isEqualTo("Customer cannot commit now");
+    }
+
+    @Test
+    void changeStage_whenSalesLeadReopensLostWithReason_shouldClearLostFieldsAndAppendHistory() {
+        when(currentUserContext.currentUser()).thenReturn(new CurrentUser(
+                ACTOR_ID,
+                TENANT_ID,
+                "SALES_LEAD",
+                Set.of("opportunity.update"),
+                "req_opp_unit_001"
+        ));
+        AdmissionOpportunity opportunity = opportunity(OPPORTUNITY_ID, LEAD_ID, ACTOR_ID);
+        opportunity.changeStage(OpportunityStage.LOST, LostReason.TUITION_TOO_HIGH, null, NOW);
+        when(admissionOpportunityRepository.findByIdAndTenantId(OPPORTUNITY_ID, TENANT_ID))
+                .thenReturn(Optional.of(opportunity));
+        when(stageHistoryRepository.findFirstByTenantIdAndOpportunityIdOrderByChangedAtDesc(TENANT_ID, OPPORTUNITY_ID))
+                .thenReturn(Optional.empty());
+        when(stageHistoryRepository.save(any(StageHistory.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(admissionOpportunityRepository.save(any(AdmissionOpportunity.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        StageChangeSnapshot snapshot = admissionOpportunityService.changeStage(new ChangeOpportunityStageCommand(
+                OPPORTUNITY_ID,
+                "NURTURING",
+                null,
+                null,
+                "Customer asked to revisit next month"
+        ));
+
+        assertThat(snapshot.fromStage()).isEqualTo("LOST");
+        assertThat(snapshot.toStage()).isEqualTo("NURTURING");
+        ArgumentCaptor<AdmissionOpportunity> opportunityCaptor = ArgumentCaptor.forClass(AdmissionOpportunity.class);
+        verify(admissionOpportunityRepository).save(opportunityCaptor.capture());
+        assertThat(opportunityCaptor.getValue().currentStage()).isEqualTo(OpportunityStage.NURTURING);
+        assertThat(opportunityCaptor.getValue().lostReason()).isNull();
+        assertThat(opportunityCaptor.getValue().lostNote()).isNull();
     }
 
     private void allowAdmin(String... permissions) {

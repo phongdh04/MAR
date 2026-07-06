@@ -5,6 +5,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -45,8 +46,10 @@ import vn.mar.lead.repository.LeadRepository;
 import vn.mar.leadimport.repository.ImportBatchRepository;
 import vn.mar.leadimport.repository.ImportRowRepository;
 import vn.mar.opportunity.entity.AdmissionOpportunity;
+import vn.mar.opportunity.entity.StageHistory;
 import vn.mar.opportunity.model.OpportunityStage;
 import vn.mar.opportunity.repository.AdmissionOpportunityRepository;
+import vn.mar.opportunity.repository.StageHistoryRepository;
 import vn.mar.opportunity.repository.TouchpointRepository;
 import vn.mar.role.repository.RoleRepository;
 import vn.mar.security.jwt.JwtTokenProvider;
@@ -123,6 +126,9 @@ class OpportunityApiSmokeTest {
     private AdmissionOpportunityRepository admissionOpportunityRepository;
 
     @MockitoBean
+    private StageHistoryRepository stageHistoryRepository;
+
+    @MockitoBean
     private TouchpointRepository touchpointRepository;
 
     @MockitoBean
@@ -138,6 +144,7 @@ class OpportunityApiSmokeTest {
     void setUp() {
         cacheEvictionService.clearPermissionProfiles();
         when(admissionOpportunityRepository.save(any(AdmissionOpportunity.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(stageHistoryRepository.save(any(StageHistory.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(auditEventRepository.save(any(AuditEvent.class))).thenAnswer(invocation -> invocation.getArgument(0));
     }
 
@@ -212,13 +219,61 @@ class OpportunityApiSmokeTest {
     }
 
     @Test
+    void changeStage_whenValidTransition_shouldReturnStageChangeEnvelope() throws Exception {
+        when(permissionProfileRepository.findActivePermissionCodes(TENANT_ID, "ADMIN"))
+                .thenReturn(Set.of("opportunity.update"));
+        when(admissionOpportunityRepository.findByIdAndTenantId(OPPORTUNITY_ID, TENANT_ID))
+                .thenReturn(Optional.of(opportunity()));
+        when(stageHistoryRepository.findFirstByTenantIdAndOpportunityIdOrderByChangedAtDesc(TENANT_ID, OPPORTUNITY_ID))
+                .thenReturn(Optional.empty());
+
+        mockMvc.perform(post("/api/v1/opportunities/{opportunityId}/stage", OPPORTUNITY_ID)
+                        .header(RequestIdFilter.HEADER_NAME, "req_opp_004")
+                        .header(HttpHeaders.AUTHORIZATION, bearerToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "to_stage": "CONTACTING",
+                                  "reason": "Advisor started handling"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.opportunity_id").value(OPPORTUNITY_ID.toString()))
+                .andExpect(jsonPath("$.data.from_stage").value("NEW"))
+                .andExpect(jsonPath("$.data.to_stage").value("CONTACTING"))
+                .andExpect(jsonPath("$.data.stage_history_id").exists())
+                .andExpect(jsonPath("$.meta.request_id").value("req_opp_004"));
+    }
+
+    @Test
+    void changeStage_whenInvalidTransition_shouldReturnConflictEnvelope() throws Exception {
+        when(permissionProfileRepository.findActivePermissionCodes(TENANT_ID, "ADMIN"))
+                .thenReturn(Set.of("opportunity.update"));
+        when(admissionOpportunityRepository.findByIdAndTenantId(OPPORTUNITY_ID, TENANT_ID))
+                .thenReturn(Optional.of(opportunity()));
+
+        mockMvc.perform(post("/api/v1/opportunities/{opportunityId}/stage", OPPORTUNITY_ID)
+                        .header(RequestIdFilter.HEADER_NAME, "req_opp_005")
+                        .header(HttpHeaders.AUTHORIZATION, bearerToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "to_stage": "ENROLLED"
+                                }
+                                """))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.error.code").value("INVALID_STAGE_TRANSITION"))
+                .andExpect(jsonPath("$.meta.request_id").value("req_opp_005"));
+    }
+
+    @Test
     void searchOpportunities_whenUnauthenticated_shouldReturnUnauthorizedEnvelope() throws Exception {
         mockMvc.perform(get("/api/v1/opportunities")
-                        .header(RequestIdFilter.HEADER_NAME, "req_opp_004"))
+                        .header(RequestIdFilter.HEADER_NAME, "req_opp_006"))
                 .andExpect(status().isUnauthorized())
-                .andExpect(header().string(RequestIdFilter.HEADER_NAME, "req_opp_004"))
+                .andExpect(header().string(RequestIdFilter.HEADER_NAME, "req_opp_006"))
                 .andExpect(jsonPath("$.error.code").value("UNAUTHENTICATED"))
-                .andExpect(jsonPath("$.meta.request_id").value("req_opp_004"));
+                .andExpect(jsonPath("$.meta.request_id").value("req_opp_006"));
     }
 
     private String bearerToken() {

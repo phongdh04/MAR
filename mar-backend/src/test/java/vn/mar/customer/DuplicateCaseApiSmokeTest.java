@@ -52,6 +52,7 @@ import vn.mar.lead.repository.LeadRepository;
 import vn.mar.leadimport.repository.ImportBatchRepository;
 import vn.mar.leadimport.repository.ImportRowRepository;
 import vn.mar.opportunity.repository.AdmissionOpportunityRepository;
+import vn.mar.opportunity.repository.StageHistoryRepository;
 import vn.mar.opportunity.repository.TouchpointRepository;
 import vn.mar.role.repository.RoleRepository;
 import vn.mar.security.jwt.JwtTokenProvider;
@@ -125,6 +126,9 @@ class DuplicateCaseApiSmokeTest {
 
     @MockitoBean
     private AdmissionOpportunityRepository admissionOpportunityRepository;
+
+    @MockitoBean
+    private StageHistoryRepository stageHistoryRepository;
 
     @MockitoBean
     private TouchpointRepository touchpointRepository;

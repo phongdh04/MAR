@@ -41,7 +41,8 @@ class FlywayMigrationNamingTest {
                         "V20260703_05__create_merge_history.sql",
                         "V20260706_01__create_admission_opportunity_foundation.sql",
                         "V20260706_02__create_stage_history.sql",
-                        "V20260706_03__create_activities.sql"
+                        "V20260706_03__create_activities.sql",
+                        "V20260706_04__create_working_hours_and_sla_policies.sql"
                 )
                 .allMatch(fileName -> FLYWAY_NAME_PATTERN.matcher(fileName).matches());
     }

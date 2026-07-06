@@ -21,6 +21,8 @@ public enum ErrorCode {
     IMPORT_FILE_INVALID("IMPORT_FILE_INVALID", HttpStatus.BAD_REQUEST, "Import file is invalid"),
     IMPORT_ROW_VALIDATION_ERROR("IMPORT_ROW_VALIDATION_ERROR", HttpStatus.UNPROCESSABLE_ENTITY, "Import row validation failed"),
     UNMERGE_NOT_ALLOWED("UNMERGE_NOT_ALLOWED", HttpStatus.UNPROCESSABLE_ENTITY, "Unmerge is not allowed"),
+    INVALID_STAGE_TRANSITION("INVALID_STAGE_TRANSITION", HttpStatus.CONFLICT, "Stage transition is invalid"),
+    LOST_REASON_REQUIRED("LOST_REASON_REQUIRED", HttpStatus.UNPROCESSABLE_ENTITY, "Lost reason is required"),
     BUSINESS_RULE_VIOLATION("BUSINESS_RULE_VIOLATION", HttpStatus.UNPROCESSABLE_ENTITY, "Business rule violation"),
     INTERNAL_ERROR("INTERNAL_ERROR", HttpStatus.INTERNAL_SERVER_ERROR, "Internal server error");
 

@@ -44,7 +44,14 @@ public class ConstraintErrorMapper {
             Map.entry("ux_customer_identities__tenant_customer_type_primary", ErrorCode.DUPLICATE_RESOURCE),
             Map.entry("ux_duplicate_cases__tenant_pair_type_open", ErrorCode.DUPLICATE_RESOURCE),
             Map.entry("ck_duplicate_cases__customers_different", ErrorCode.BUSINESS_RULE_VIOLATION),
-            Map.entry("ck_duplicate_cases__resolution_reason_required", ErrorCode.VALIDATION_ERROR)
+            Map.entry("ck_duplicate_cases__resolution_reason_required", ErrorCode.VALIDATION_ERROR),
+            Map.entry("ck_admission_opportunities__lost_reason_required", ErrorCode.LOST_REASON_REQUIRED),
+            Map.entry("ck_admission_opportunities__lost_reason", ErrorCode.VALIDATION_ERROR),
+            Map.entry("ck_admission_opportunities__lost_note_required", ErrorCode.LOST_REASON_REQUIRED),
+            Map.entry("ck_stage_history__from_stage", ErrorCode.VALIDATION_ERROR),
+            Map.entry("ck_stage_history__to_stage", ErrorCode.VALIDATION_ERROR),
+            Map.entry("ck_stage_history__changed_by_type", ErrorCode.VALIDATION_ERROR),
+            Map.entry("ck_stage_history__duration_non_negative", ErrorCode.VALIDATION_ERROR)
     );
 
     public Optional<ErrorCode> map(String constraintName) {

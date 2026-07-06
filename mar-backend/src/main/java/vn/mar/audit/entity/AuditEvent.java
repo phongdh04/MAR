@@ -89,8 +89,8 @@ public class AuditEvent {
         return new AuditEvent(command, createdAt);
     }
 
-    public String action() {
-        return action;
+    public UUID id() {
+        return id;
     }
 
     public UUID tenantId() {
@@ -101,11 +101,51 @@ public class AuditEvent {
         return actorId;
     }
 
+    public String actorType() {
+        return actorType;
+    }
+
+    public String actorRole() {
+        return actorRole;
+    }
+
+    public String action() {
+        return action;
+    }
+
+    public String resourceType() {
+        return resourceType;
+    }
+
     public UUID resourceId() {
         return resourceId;
     }
 
+    public String resourceKey() {
+        return resourceKey;
+    }
+
+    public Map<String, Object> beforeData() {
+        return beforeData;
+    }
+
+    public Map<String, Object> afterData() {
+        return afterData;
+    }
+
+    public Map<String, Object> metadata() {
+        return metadata;
+    }
+
     public String reason() {
         return reason;
+    }
+
+    public String requestId() {
+        return requestId;
+    }
+
+    public Instant createdAt() {
+        return createdAt;
     }
 }

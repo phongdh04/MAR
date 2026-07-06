@@ -78,6 +78,8 @@ import vn.mar.opportunity.repository.StageHistoryRepository;
 import vn.mar.opportunity.repository.TouchpointRepository;
 import vn.mar.security.context.CurrentUser;
 import vn.mar.security.context.CurrentUserContext;
+import vn.mar.sla.api.CompleteFirstResponseSlaTaskCommand;
+import vn.mar.sla.api.SlaTaskManagementService;
 import vn.mar.user.entity.User;
 import vn.mar.user.model.UserStatus;
 import vn.mar.user.repository.UserRepository;
@@ -132,6 +134,7 @@ public class AdmissionOpportunityService implements AdmissionOpportunityManageme
     private final BranchRepository branchRepository;
     private final UserRepository userRepository;
     private final AdmissionOpportunityMapper admissionOpportunityMapper;
+    private final SlaTaskManagementService slaTaskManagementService;
     private final TimeProvider timeProvider;
     private final CurrentUserContext currentUserContext;
     private final AuditService auditService;
@@ -149,6 +152,7 @@ public class AdmissionOpportunityService implements AdmissionOpportunityManageme
             BranchRepository branchRepository,
             UserRepository userRepository,
             AdmissionOpportunityMapper admissionOpportunityMapper,
+            SlaTaskManagementService slaTaskManagementService,
             TimeProvider timeProvider,
             CurrentUserContext currentUserContext,
             AuditService auditService) {
@@ -164,6 +168,7 @@ public class AdmissionOpportunityService implements AdmissionOpportunityManageme
         this.branchRepository = branchRepository;
         this.userRepository = userRepository;
         this.admissionOpportunityMapper = admissionOpportunityMapper;
+        this.slaTaskManagementService = slaTaskManagementService;
         this.timeProvider = timeProvider;
         this.currentUserContext = currentUserContext;
         this.auditService = auditService;
@@ -303,6 +308,16 @@ public class AdmissionOpportunityService implements AdmissionOpportunityManageme
         );
         Activity savedActivity = activityRepository.save(activity);
         auditActivityCreated(savedActivity, actor);
+        if (savedActivity.firstResponseCandidate()) {
+            slaTaskManagementService.completeFirstResponseTask(new CompleteFirstResponseSlaTaskCommand(
+                    savedActivity.tenantId(),
+                    savedActivity.opportunityId(),
+                    savedActivity.id(),
+                    savedActivity.occurredAt(),
+                    actor.actorId(),
+                    actor.roleCode()
+            ));
+        }
         return admissionOpportunityMapper.toSnapshot(savedActivity);
     }
 

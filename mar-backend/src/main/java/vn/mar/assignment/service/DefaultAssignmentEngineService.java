@@ -43,11 +43,14 @@ import vn.mar.common.exception.BusinessException;
 import vn.mar.common.exception.ValidationException;
 import vn.mar.common.logging.LogContext;
 import vn.mar.common.time.TimeProvider;
+import vn.mar.lead.model.LeadTemperature;
 import vn.mar.opportunity.api.AssignOpportunityOwnerCommand;
 import vn.mar.opportunity.api.OpportunityAssignmentService;
 import vn.mar.opportunity.api.OpportunityAssignmentSnapshot;
 import vn.mar.security.context.CurrentUser;
 import vn.mar.security.context.CurrentUserContext;
+import vn.mar.sla.api.OpenFirstResponseSlaTaskCommand;
+import vn.mar.sla.api.SlaTaskManagementService;
 import vn.mar.user.entity.User;
 import vn.mar.user.model.UserStatus;
 import vn.mar.user.repository.UserRepository;
@@ -68,6 +71,7 @@ public class DefaultAssignmentEngineService implements AssignmentEngineService {
     private final AssignmentHistoryRepository assignmentHistoryRepository;
     private final UnassignedAssignmentItemRepository unassignedAssignmentItemRepository;
     private final OpportunityAssignmentService opportunityAssignmentService;
+    private final SlaTaskManagementService slaTaskManagementService;
     private final UserRepository userRepository;
     private final UserBranchRepository userBranchRepository;
     private final CurrentUserContext currentUserContext;
@@ -81,6 +85,7 @@ public class DefaultAssignmentEngineService implements AssignmentEngineService {
             AssignmentHistoryRepository assignmentHistoryRepository,
             UnassignedAssignmentItemRepository unassignedAssignmentItemRepository,
             OpportunityAssignmentService opportunityAssignmentService,
+            SlaTaskManagementService slaTaskManagementService,
             UserRepository userRepository,
             UserBranchRepository userBranchRepository,
             CurrentUserContext currentUserContext,
@@ -92,6 +97,7 @@ public class DefaultAssignmentEngineService implements AssignmentEngineService {
         this.assignmentHistoryRepository = assignmentHistoryRepository;
         this.unassignedAssignmentItemRepository = unassignedAssignmentItemRepository;
         this.opportunityAssignmentService = opportunityAssignmentService;
+        this.slaTaskManagementService = slaTaskManagementService;
         this.userRepository = userRepository;
         this.userBranchRepository = userBranchRepository;
         this.currentUserContext = currentUserContext;
@@ -196,6 +202,17 @@ public class DefaultAssignmentEngineService implements AssignmentEngineService {
                 now,
                 actor.actorId(),
                 normalizeReason(reason, source, assignmentRuleId)
+        ));
+        slaTaskManagementService.openFirstResponseTask(new OpenFirstResponseSlaTaskCommand(
+                assignedOpportunity.tenantId(),
+                assignedOpportunity.opportunityId(),
+                assignedOpportunity.sourceLeadId(),
+                selectedAdvisorId,
+                assignedOpportunity.branchId(),
+                resolveLeadTemperature(assignedOpportunity.leadTemperature()),
+                now,
+                actor.actorId(),
+                actor.roleCode()
         ));
         resolveOpenUnassignedItem(actor, opportunity, now);
         return new AssignmentResultSnapshot(
@@ -450,6 +467,17 @@ public class DefaultAssignmentEngineService implements AssignmentEngineService {
             return "Assignment rule applied: " + assignmentRuleId;
         }
         return "Fallback assignment applied";
+    }
+
+    private LeadTemperature resolveLeadTemperature(String leadTemperature) {
+        if (leadTemperature == null || leadTemperature.isBlank()) {
+            return LeadTemperature.NORMAL;
+        }
+        try {
+            return LeadTemperature.valueOf(leadTemperature.trim().toUpperCase(java.util.Locale.ROOT));
+        } catch (IllegalArgumentException exception) {
+            throw new BusinessException(ErrorCode.BUSINESS_RULE_VIOLATION, "Opportunity lead temperature is invalid");
+        }
     }
 
     private void auditUnassignedItemCreated(CurrentUser actor, UnassignedAssignmentItem item) {

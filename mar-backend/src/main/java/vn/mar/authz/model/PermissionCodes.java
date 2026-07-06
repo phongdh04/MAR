@@ -23,6 +23,8 @@ public final class PermissionCodes {
     public static final String ACTIVITY_CREATE = "activity.create";
     public static final String SLA_VIEW = "sla.view";
     public static final String SLA_MANAGE = "sla.manage";
+    public static final String ASSIGNMENT_VIEW = "assignment.view";
+    public static final String ASSIGNMENT_MANAGE = "assignment.manage";
     public static final String DATA_EXPORT = "data.export";
     public static final String PAYMENT_WRITE = "payment.write";
     public static final String AUDIT_VIEW = "audit.view";

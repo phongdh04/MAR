@@ -35,6 +35,10 @@ public final class AuditActions {
     public static final String ACTIVITY_CREATED = "ACTIVITY_CREATED";
     public static final String WORKING_HOURS_UPDATED = "WORKING_HOURS_UPDATED";
     public static final String SLA_POLICY_UPDATED = "SLA_POLICY_UPDATED";
+    public static final String ASSIGNMENT_RULE_CREATED = "ASSIGNMENT_RULE_CREATED";
+    public static final String ASSIGNMENT_RULE_UPDATED = "ASSIGNMENT_RULE_UPDATED";
+    public static final String OPPORTUNITY_ASSIGNED = "OPPORTUNITY_ASSIGNED";
+    public static final String UNASSIGNED_ASSIGNMENT_ITEM_CREATED = "UNASSIGNED_ASSIGNMENT_ITEM_CREATED";
 
     private AuditActions() {
     }

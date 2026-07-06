@@ -15,6 +15,7 @@ public final class AuditResourceTypes {
     public static final String MERGE_HISTORY = "MERGE_HISTORY";
     public static final String LEAD = "LEAD";
     public static final String ADMISSION_OPPORTUNITY = "ADMISSION_OPPORTUNITY";
+    public static final String STAGE_HISTORY = "STAGE_HISTORY";
     public static final String TOUCHPOINT = "TOUCHPOINT";
 
     private AuditResourceTypes() {

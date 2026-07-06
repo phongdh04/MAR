@@ -1,11 +1,13 @@
 package vn.mar.opportunity.service;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.util.EnumSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import org.springframework.data.domain.Page;
@@ -45,15 +47,20 @@ import vn.mar.lead.repository.LeadRepository;
 import vn.mar.opportunity.api.AdmissionOpportunityManagementService;
 import vn.mar.opportunity.api.AdmissionOpportunitySearchCommand;
 import vn.mar.opportunity.api.AdmissionOpportunitySnapshot;
+import vn.mar.opportunity.api.ChangeOpportunityStageCommand;
 import vn.mar.opportunity.api.CreateAdmissionOpportunityCommand;
+import vn.mar.opportunity.api.StageChangeSnapshot;
 import vn.mar.opportunity.api.UpdateAdmissionOpportunityCommand;
 import vn.mar.opportunity.entity.AdmissionOpportunity;
+import vn.mar.opportunity.entity.StageHistory;
 import vn.mar.opportunity.entity.Touchpoint;
 import vn.mar.opportunity.mapper.AdmissionOpportunityMapper;
+import vn.mar.opportunity.model.LostReason;
 import vn.mar.opportunity.model.OpportunityStage;
 import vn.mar.opportunity.model.QualificationStatus;
 import vn.mar.opportunity.model.TouchpointType;
 import vn.mar.opportunity.repository.AdmissionOpportunityRepository;
+import vn.mar.opportunity.repository.StageHistoryRepository;
 import vn.mar.opportunity.repository.TouchpointRepository;
 import vn.mar.security.context.CurrentUser;
 import vn.mar.security.context.CurrentUserContext;
@@ -80,9 +87,28 @@ public class AdmissionOpportunityService implements AdmissionOpportunityManageme
             OpportunityStage.DEPOSIT_PAID,
             OpportunityStage.NURTURING
     );
+    private static final Map<OpportunityStage, Set<OpportunityStage>> ALLOWED_TRANSITIONS = Map.ofEntries(
+            Map.entry(OpportunityStage.NEW, EnumSet.of(OpportunityStage.CONTACTING, OpportunityStage.LOST)),
+            Map.entry(OpportunityStage.CONTACTING, EnumSet.of(OpportunityStage.CONTACTED, OpportunityStage.LOST, OpportunityStage.NURTURING)),
+            Map.entry(OpportunityStage.CONTACTED, EnumSet.of(OpportunityStage.QUALIFIED, OpportunityStage.LOST, OpportunityStage.NURTURING)),
+            Map.entry(OpportunityStage.QUALIFIED, EnumSet.of(OpportunityStage.PROGRAM_SELECTED, OpportunityStage.APPOINTMENT_BOOKED, OpportunityStage.CONSULTING, OpportunityStage.LOST)),
+            Map.entry(OpportunityStage.PROGRAM_SELECTED, EnumSet.of(OpportunityStage.APPOINTMENT_BOOKED, OpportunityStage.CONSULTING, OpportunityStage.LOST)),
+            Map.entry(OpportunityStage.APPOINTMENT_BOOKED, EnumSet.of(OpportunityStage.APPOINTMENT_DONE, OpportunityStage.NO_SHOW, OpportunityStage.CANCELLED)),
+            Map.entry(OpportunityStage.APPOINTMENT_DONE, EnumSet.of(OpportunityStage.CONSULTING, OpportunityStage.DEPOSIT_PAID, OpportunityStage.ENROLLED, OpportunityStage.LOST)),
+            Map.entry(OpportunityStage.NO_SHOW, EnumSet.of(OpportunityStage.CONTACTING, OpportunityStage.NURTURING, OpportunityStage.LOST)),
+            Map.entry(OpportunityStage.CONSULTING, EnumSet.of(OpportunityStage.DEPOSIT_PAID, OpportunityStage.ENROLLED, OpportunityStage.LOST, OpportunityStage.NURTURING)),
+            Map.entry(OpportunityStage.DEPOSIT_PAID, EnumSet.of(OpportunityStage.ENROLLED, OpportunityStage.LOST, OpportunityStage.REFUNDED)),
+            Map.entry(OpportunityStage.ENROLLED, EnumSet.noneOf(OpportunityStage.class)),
+            Map.entry(OpportunityStage.LOST, EnumSet.of(OpportunityStage.CONTACTING, OpportunityStage.NURTURING)),
+            Map.entry(OpportunityStage.NURTURING, EnumSet.of(OpportunityStage.CONTACTING, OpportunityStage.QUALIFIED, OpportunityStage.LOST)),
+            Map.entry(OpportunityStage.CANCELLED, EnumSet.noneOf(OpportunityStage.class)),
+            Map.entry(OpportunityStage.REFUNDED, EnumSet.noneOf(OpportunityStage.class))
+    );
+    private static final Set<String> LOST_REOPEN_ROLES = Set.of("ADMIN", "SALES_LEAD");
 
     private final AdmissionOpportunityRepository admissionOpportunityRepository;
     private final TouchpointRepository touchpointRepository;
+    private final StageHistoryRepository stageHistoryRepository;
     private final LeadRepository leadRepository;
     private final CustomerProfileRepository customerProfileRepository;
     private final LanguageRepository languageRepository;
@@ -98,6 +124,7 @@ public class AdmissionOpportunityService implements AdmissionOpportunityManageme
     public AdmissionOpportunityService(
             AdmissionOpportunityRepository admissionOpportunityRepository,
             TouchpointRepository touchpointRepository,
+            StageHistoryRepository stageHistoryRepository,
             LeadRepository leadRepository,
             CustomerProfileRepository customerProfileRepository,
             LanguageRepository languageRepository,
@@ -111,6 +138,7 @@ public class AdmissionOpportunityService implements AdmissionOpportunityManageme
             AuditService auditService) {
         this.admissionOpportunityRepository = admissionOpportunityRepository;
         this.touchpointRepository = touchpointRepository;
+        this.stageHistoryRepository = stageHistoryRepository;
         this.leadRepository = leadRepository;
         this.customerProfileRepository = customerProfileRepository;
         this.languageRepository = languageRepository;
@@ -246,6 +274,52 @@ public class AdmissionOpportunityService implements AdmissionOpportunityManageme
         return admissionOpportunityMapper.toSnapshot(savedOpportunity);
     }
 
+    @Override
+    @Transactional
+    public StageChangeSnapshot changeStage(ChangeOpportunityStageCommand command) {
+        validateChangeStageCommand(command);
+        CurrentUser actor = currentUserContext.currentUser();
+        assertPermission(actor, PermissionCodes.OPPORTUNITY_UPDATE, "OPPORTUNITY_UPDATE_DENIED", "Permission is required to update opportunity stage");
+        UUID tenantId = requireTenantContext(actor);
+        AdmissionOpportunity opportunity = findOpportunity(tenantId, command.opportunityId());
+        assertOpportunityVisibleToActor(actor, opportunity);
+
+        OpportunityStage fromStage = opportunity.currentStage();
+        OpportunityStage toStage = resolveRequiredStage(command.toStage());
+        assertTransitionAllowed(actor, fromStage, toStage);
+        LostReason lostReason = resolveLostReasonForStage(toStage, command.lostReason());
+        String lostNote = normalizeOptional(command.lostNote());
+        String reason = normalizeOptional(command.reason());
+        validateStageChangeBusinessRules(opportunity, fromStage, toStage, lostReason, lostNote, reason);
+
+        Instant now = timeProvider.now();
+        Map<String, Object> beforeData = admissionOpportunityMapper.toAuditData(opportunity);
+        StageHistory stageHistory = StageHistory.create(
+                UUID.randomUUID(),
+                tenantId,
+                opportunity.id(),
+                fromStage,
+                toStage,
+                actor.actorId(),
+                actor.actorId() == null ? "SYSTEM" : "USER",
+                now,
+                reason,
+                durationInPreviousStageSeconds(opportunity, now)
+        );
+        StageHistory savedStageHistory = stageHistoryRepository.save(stageHistory);
+        opportunity.changeStage(toStage, lostReason, lostNote, now);
+        AdmissionOpportunity savedOpportunity = admissionOpportunityRepository.save(opportunity);
+        auditStageChange(savedOpportunity, actor, savedStageHistory, beforeData, reason);
+
+        return new StageChangeSnapshot(
+                savedOpportunity.id(),
+                fromStage.name(),
+                toStage.name(),
+                savedStageHistory.id(),
+                savedStageHistory.changedAt()
+        );
+    }
+
     private AdmissionOpportunity createNewOpportunity(
             UUID tenantId,
             UUID customerId,
@@ -322,6 +396,16 @@ public class AdmissionOpportunityService implements AdmissionOpportunityManageme
             throw validation("command", "REQUIRED", "Opportunity update command is required");
         }
         requireId(command.opportunityId(), "opportunity_id", "Opportunity id is required");
+    }
+
+    private void validateChangeStageCommand(ChangeOpportunityStageCommand command) {
+        if (command == null) {
+            throw validation("command", "REQUIRED", "Opportunity stage change command is required");
+        }
+        requireId(command.opportunityId(), "opportunity_id", "Opportunity id is required");
+        if (!StringUtils.hasText(command.toStage())) {
+            throw validation("to_stage", "REQUIRED", "Target stage is required");
+        }
     }
 
     private Lead findLead(UUID tenantId, UUID leadId) {
@@ -482,6 +566,32 @@ public class AdmissionOpportunityService implements AdmissionOpportunityManageme
         }
     }
 
+    private OpportunityStage resolveRequiredStage(String requestedStage) {
+        try {
+            return OpportunityStage.valueOf(normalizeEnum(requestedStage));
+        } catch (IllegalArgumentException exception) {
+            throw validation("to_stage", "INVALID_STAGE", "Target stage is invalid");
+        }
+    }
+
+    private LostReason resolveLostReasonForStage(OpportunityStage toStage, String requestedLostReason) {
+        if (toStage != OpportunityStage.LOST) {
+            return null;
+        }
+        if (!StringUtils.hasText(requestedLostReason)) {
+            throw new BusinessException(
+                    ErrorCode.LOST_REASON_REQUIRED,
+                    ErrorCode.LOST_REASON_REQUIRED.defaultMessage(),
+                    List.of(ErrorDetail.of("lost_reason", "REQUIRED", "Lost reason is required"))
+            );
+        }
+        try {
+            return LostReason.valueOf(normalizeEnum(requestedLostReason));
+        } catch (IllegalArgumentException exception) {
+            throw validation("lost_reason", "INVALID_LOST_REASON", "Lost reason is invalid");
+        }
+    }
+
     private QualificationStatus resolveQualificationStatus(
             String requestedStatus,
             QualificationStatus currentStatus) {
@@ -520,6 +630,46 @@ public class AdmissionOpportunityService implements AdmissionOpportunityManageme
         return requestedOwnerId;
     }
 
+    private void assertTransitionAllowed(CurrentUser actor, OpportunityStage fromStage, OpportunityStage toStage) {
+        Set<OpportunityStage> allowedTargets = ALLOWED_TRANSITIONS.getOrDefault(fromStage, Set.of());
+        if (!allowedTargets.contains(toStage)) {
+            throw invalidStageTransition(fromStage, toStage);
+        }
+        if (fromStage == OpportunityStage.LOST && !LOST_REOPEN_ROLES.contains(actor.roleCode())) {
+            throw forbidden("stage", "REOPEN_SCOPE_REQUIRED", "Only Sales Lead or Admin can reopen lost opportunities");
+        }
+    }
+
+    private void validateStageChangeBusinessRules(
+            AdmissionOpportunity opportunity,
+            OpportunityStage fromStage,
+            OpportunityStage toStage,
+            LostReason lostReason,
+            String lostNote,
+            String reason) {
+        if (toStage == OpportunityStage.LOST && lostReason == LostReason.OTHER && !StringUtils.hasText(lostNote)) {
+            throw new BusinessException(
+                    ErrorCode.LOST_REASON_REQUIRED,
+                    "Lost note is required when lost reason is OTHER",
+                    List.of(ErrorDetail.of("lost_note", "LOST_NOTE_REQUIRED", "Lost note is required when lost reason is OTHER"))
+            );
+        }
+        if (fromStage == OpportunityStage.LOST && !StringUtils.hasText(reason)) {
+            throw new BusinessException(
+                    ErrorCode.BUSINESS_RULE_VIOLATION,
+                    "Reopen reason is required",
+                    List.of(ErrorDetail.of("reason", "REOPEN_REASON_REQUIRED", "Reopen reason is required"))
+            );
+        }
+        if (toStage == OpportunityStage.PROGRAM_SELECTED && opportunity.programId() == null) {
+            throw new BusinessException(
+                    ErrorCode.BUSINESS_RULE_VIOLATION,
+                    "Program is required before selecting program stage",
+                    List.of(ErrorDetail.of("program_id", "PROGRAM_REQUIRED", "Program is required before selecting program stage"))
+            );
+        }
+    }
+
     private void assertOpportunityVisibleToActor(CurrentUser actor, AdmissionOpportunity opportunity) {
         if (isAdvisor(actor) && !actor.actorId().equals(opportunity.ownerId())) {
             throw forbidden("opportunity_id", "OWN_SCOPE_REQUIRED", "Advisor can only access own opportunities");
@@ -528,6 +678,16 @@ public class AdmissionOpportunityService implements AdmissionOpportunityManageme
 
     private boolean isAdvisor(CurrentUser actor) {
         return actor != null && "ADVISOR".equals(actor.roleCode());
+    }
+
+    private Long durationInPreviousStageSeconds(AdmissionOpportunity opportunity, Instant changedAt) {
+        Optional<StageHistory> latestHistory = stageHistoryRepository
+                .findFirstByTenantIdAndOpportunityIdOrderByChangedAtDesc(opportunity.tenantId(), opportunity.id());
+        Instant previousChangedAt = latestHistory
+                .map(StageHistory::changedAt)
+                .orElse(opportunity.createdAt());
+        long seconds = Duration.between(previousChangedAt, changedAt).getSeconds();
+        return Math.max(seconds, 0L);
     }
 
     private void assertPermission(CurrentUser actor, String permissionCode, String detailCode, String message) {
@@ -615,6 +775,17 @@ public class AdmissionOpportunityService implements AdmissionOpportunityManageme
         );
     }
 
+    private BusinessException invalidStageTransition(OpportunityStage fromStage, OpportunityStage toStage) {
+        return new BusinessException(
+                ErrorCode.INVALID_STAGE_TRANSITION,
+                "Stage transition is not allowed",
+                List.of(
+                        ErrorDetail.of("from_stage", fromStage.name(), "Current stage cannot transition to target stage"),
+                        ErrorDetail.of("to_stage", toStage.name(), "Target stage is not allowed")
+                )
+        );
+    }
+
     private ValidationException validation(String field, String code, String message) {
         return new ValidationException(
                 ErrorCode.VALIDATION_ERROR.defaultMessage(),
@@ -649,6 +820,34 @@ public class AdmissionOpportunityService implements AdmissionOpportunityManageme
                 beforeData,
                 afterData,
                 auditMetadata(actor),
+                reason,
+                LogContext.requestId()
+        ));
+    }
+
+    private void auditStageChange(
+            AdmissionOpportunity opportunity,
+            CurrentUser actor,
+            StageHistory stageHistory,
+            Map<String, Object> beforeData,
+            String reason) {
+        Map<String, Object> metadata = auditMetadata(actor);
+        metadata.put("stage_history_id", stageHistory.id().toString());
+        metadata.put("from_stage", stageHistory.fromStage().name());
+        metadata.put("to_stage", stageHistory.toStage().name());
+        metadata.put("duration_in_previous_stage_seconds", stageHistory.durationInPreviousStageSeconds());
+        auditService.record(new AuditRecordCommand(
+                opportunity.tenantId(),
+                actor.actorId(),
+                actor.actorId() == null ? "SYSTEM" : "USER",
+                actor.roleCode(),
+                AuditActions.OPPORTUNITY_STAGE_CHANGED,
+                AuditResourceTypes.ADMISSION_OPPORTUNITY,
+                opportunity.id(),
+                opportunity.id().toString(),
+                beforeData,
+                admissionOpportunityMapper.toAuditData(opportunity),
+                metadata,
                 reason,
                 LogContext.requestId()
         ));

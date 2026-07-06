@@ -16,6 +16,8 @@ public record OpportunityResponse(
         String currentStage,
         String qualificationStatus,
         String leadTemperature,
+        String lostReason,
+        String lostNote,
         UUID firstTouchId,
         UUID lastTouchId,
         Instant createdAt,

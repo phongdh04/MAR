@@ -12,4 +12,6 @@ public interface AdmissionOpportunityManagementService {
     AdmissionOpportunitySnapshot getOpportunity(UUID opportunityId);
 
     AdmissionOpportunitySnapshot updateOpportunity(UpdateAdmissionOpportunityCommand command);
+
+    StageChangeSnapshot changeStage(ChangeOpportunityStageCommand command);
 }

@@ -9,6 +9,7 @@ import jakarta.persistence.Table;
 import java.time.Instant;
 import java.util.UUID;
 import vn.mar.lead.model.LeadTemperature;
+import vn.mar.opportunity.model.LostReason;
 import vn.mar.opportunity.model.OpportunityStage;
 import vn.mar.opportunity.model.QualificationStatus;
 
@@ -59,8 +60,9 @@ public class AdmissionOpportunity {
     @Column(name = "sla_policy_id")
     private UUID slaPolicyId;
 
+    @Enumerated(EnumType.STRING)
     @Column(name = "lost_reason")
-    private String lostReason;
+    private LostReason lostReason;
 
     @Column(name = "lost_note")
     private String lostNote;
@@ -94,7 +96,7 @@ public class AdmissionOpportunity {
             QualificationStatus qualificationStatus,
             LeadTemperature leadTemperature,
             UUID slaPolicyId,
-            String lostReason,
+            LostReason lostReason,
             String lostNote,
             UUID firstTouchId,
             UUID lastTouchId,
@@ -171,6 +173,21 @@ public class AdmissionOpportunity {
         this.updatedAt = now;
     }
 
+    public void changeStage(OpportunityStage nextStage, LostReason nextLostReason, String nextLostNote, Instant now) {
+        this.currentStage = nextStage;
+        if (nextStage == OpportunityStage.LOST) {
+            this.lostReason = nextLostReason;
+            this.lostNote = nextLostNote;
+        } else {
+            this.lostReason = null;
+            this.lostNote = null;
+        }
+        if (nextStage == OpportunityStage.QUALIFIED) {
+            this.qualificationStatus = QualificationStatus.QUALIFIED;
+        }
+        this.updatedAt = now;
+    }
+
     public void linkTouchpoint(UUID touchpointId, Instant now) {
         if (firstTouchId == null) {
             firstTouchId = touchpointId;
@@ -225,6 +242,14 @@ public class AdmissionOpportunity {
 
     public LeadTemperature leadTemperature() {
         return leadTemperature;
+    }
+
+    public LostReason lostReason() {
+        return lostReason;
+    }
+
+    public String lostNote() {
+        return lostNote;
     }
 
     public UUID firstTouchId() {

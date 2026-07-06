@@ -4,7 +4,9 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import org.springframework.stereotype.Component;
 import vn.mar.opportunity.api.AdmissionOpportunitySnapshot;
+import vn.mar.opportunity.api.StageChangeSnapshot;
 import vn.mar.opportunity.dto.response.OpportunityResponse;
+import vn.mar.opportunity.dto.response.StageChangeResponse;
 import vn.mar.opportunity.entity.AdmissionOpportunity;
 
 @Component
@@ -24,6 +26,8 @@ public class AdmissionOpportunityMapper {
                 opportunity.currentStage().name(),
                 opportunity.qualificationStatus() == null ? null : opportunity.qualificationStatus().name(),
                 opportunity.leadTemperature() == null ? null : opportunity.leadTemperature().name(),
+                opportunity.lostReason() == null ? null : opportunity.lostReason().name(),
+                opportunity.lostNote(),
                 opportunity.firstTouchId(),
                 opportunity.lastTouchId(),
                 opportunity.createdAt(),
@@ -45,10 +49,22 @@ public class AdmissionOpportunityMapper {
                 snapshot.currentStage(),
                 snapshot.qualificationStatus(),
                 snapshot.leadTemperature(),
+                snapshot.lostReason(),
+                snapshot.lostNote(),
                 snapshot.firstTouchId(),
                 snapshot.lastTouchId(),
                 snapshot.createdAt(),
                 snapshot.updatedAt()
+        );
+    }
+
+    public StageChangeResponse toResponse(StageChangeSnapshot snapshot) {
+        return new StageChangeResponse(
+                snapshot.opportunityId(),
+                snapshot.fromStage(),
+                snapshot.toStage(),
+                snapshot.stageHistoryId(),
+                snapshot.changedAt()
         );
     }
 
@@ -66,6 +82,8 @@ public class AdmissionOpportunityMapper {
         data.put("current_stage", opportunity.currentStage().name());
         data.put("qualification_status", opportunity.qualificationStatus() == null ? null : opportunity.qualificationStatus().name());
         data.put("lead_temperature", opportunity.leadTemperature() == null ? null : opportunity.leadTemperature().name());
+        data.put("lost_reason", opportunity.lostReason() == null ? null : opportunity.lostReason().name());
+        data.put("lost_note", opportunity.lostNote());
         data.put("first_touch_id", opportunity.firstTouchId() == null ? null : opportunity.firstTouchId().toString());
         data.put("last_touch_id", opportunity.lastTouchId() == null ? null : opportunity.lastTouchId().toString());
         return data;

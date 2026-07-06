@@ -314,6 +314,49 @@ class CustomerProfileServiceTest {
     }
 
     @Test
+    void autoLinkOrCreate_whenEmailExactButPhoneDifferent_shouldCreateCustomerForDuplicateReviewWithoutEmailAutoLink() {
+        when(customerIdentityRepository.findByTenantIdAndIdentityTypeAndNormalizedValue(
+                TENANT_ID,
+                CustomerIdentityType.PHONE,
+                "0900000002"
+        )).thenReturn(List.of());
+        when(customerProfileRepository.save(any(CustomerProfile.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        CustomerAutoLinkResult result = customerProfileService.autoLinkOrCreate(new CustomerAutoLinkCommand(
+                TENANT_ID,
+                "Incoming Email Match",
+                "0900000002",
+                " Shared@Example.COM ",
+                null,
+                false
+        ));
+
+        assertThat(result.action()).isEqualTo(CustomerAutoLinkAction.CREATED);
+        assertThat(result.customer().primaryPhone()).isEqualTo("0900000002");
+        assertThat(result.customer().primaryEmail()).isEqualTo("shared@example.com");
+        verify(customerIdentityRepository).findByTenantIdAndIdentityTypeAndNormalizedValue(
+                TENANT_ID,
+                CustomerIdentityType.PHONE,
+                "0900000002"
+        );
+        verify(customerIdentityRepository, never()).findByTenantIdAndIdentityTypeAndNormalizedValue(
+                TENANT_ID,
+                CustomerIdentityType.EMAIL,
+                "shared@example.com"
+        );
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<List<CustomerIdentity>> identitiesCaptor = ArgumentCaptor.forClass(List.class);
+        verify(customerIdentityRepository).saveAll(identitiesCaptor.capture());
+        assertThat(identitiesCaptor.getValue())
+                .extracting(CustomerIdentity::identityType)
+                .containsExactly(CustomerIdentityType.PHONE, CustomerIdentityType.EMAIL);
+        assertThat(identitiesCaptor.getValue())
+                .extracting(CustomerIdentity::normalizedValue)
+                .containsExactly("0900000002", "shared@example.com");
+    }
+
+    @Test
     void autoLinkOrCreate_whenOnlyNameLooksSame_shouldCreateAndNotMergeByName() {
         when(customerIdentityRepository.findByTenantIdAndIdentityTypeAndNormalizedValue(
                 TENANT_ID,

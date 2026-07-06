@@ -290,6 +290,39 @@ class DuplicateCaseServiceTest {
     }
 
     @Test
+    void resolveCase_whenLinkValid_shouldMarkLinkedAndAuditWithoutMergeHistory() {
+        mockCurrentUser(PermissionCodes.DUPLICATE_MANAGE);
+        DuplicateCase duplicateCase = duplicateCase(DuplicateCaseStatus.NEEDS_REVIEW);
+        when(duplicateCaseRepository.findByIdAndTenantId(DUPLICATE_CASE_ID, TENANT_ID))
+                .thenReturn(Optional.of(duplicateCase));
+        mockCustomerPair();
+        when(duplicateCaseRepository.save(any(DuplicateCase.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        DuplicateCaseSnapshot result = duplicateCaseService.resolveCase(new DuplicateCaseResolveCommand(
+                DUPLICATE_CASE_ID,
+                "LINK",
+                null,
+                "Same guardian but keep two learner profiles"
+        ));
+
+        assertThat(result.status()).isEqualTo(DuplicateCaseStatus.LINKED);
+        assertThat(result.resolutionAction()).isEqualTo(DuplicateResolutionAction.LINK);
+        assertThat(result.resolutionReason()).isEqualTo("Same guardian but keep two learner profiles");
+        assertThat(result.resolvedBy()).isEqualTo(ACTOR_ID);
+
+        ArgumentCaptor<AuditRecordCommand> auditCaptor = ArgumentCaptor.forClass(AuditRecordCommand.class);
+        verify(auditService).record(auditCaptor.capture());
+        assertThat(auditCaptor.getValue().reason()).isEqualTo("Same guardian but keep two learner profiles");
+        verify(customerMergeService, never()).recordMerge(
+                any(DuplicateCase.class),
+                any(CustomerProfile.class),
+                any(CustomerProfile.class),
+                any(CurrentUser.class),
+                any(String.class)
+        );
+    }
+
+    @Test
     void resolveCase_whenAlreadyResolved_shouldRejectConflict() {
         mockCurrentUser(PermissionCodes.DUPLICATE_MANAGE);
         when(duplicateCaseRepository.findByIdAndTenantId(DUPLICATE_CASE_ID, TENANT_ID))

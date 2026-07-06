@@ -38,6 +38,8 @@ import vn.mar.audit.model.AuditResourceTypes;
 import vn.mar.audit.service.AuditRecordCommand;
 import vn.mar.audit.service.AuditService;
 import vn.mar.authz.model.PermissionCodes;
+import vn.mar.authz.service.BranchScopeGuard;
+import vn.mar.authz.service.PermissionGuard;
 import vn.mar.branch.entity.Branch;
 import vn.mar.branch.model.BranchStatus;
 import vn.mar.branch.repository.BranchRepository;
@@ -68,7 +70,6 @@ import vn.mar.userbranch.repository.UserBranchRepository;
 public class AssignmentRuleService {
 
     private static final String ROLE_ADVISOR = "ADVISOR";
-    private static final String ROLE_SALES_LEAD = "SALES_LEAD";
 
     private final AssignmentRuleRepository assignmentRuleRepository;
     private final AssignmentRuleAdvisorRepository assignmentRuleAdvisorRepository;
@@ -82,6 +83,8 @@ public class AssignmentRuleService {
     private final CurrentUserContext currentUserContext;
     private final AuditService auditService;
     private final TimeProvider timeProvider;
+    private final PermissionGuard permissionGuard;
+    private final BranchScopeGuard branchScopeGuard;
 
     public AssignmentRuleService(
             AssignmentRuleRepository assignmentRuleRepository,
@@ -95,7 +98,9 @@ public class AssignmentRuleService {
             AssignmentMapper assignmentMapper,
             CurrentUserContext currentUserContext,
             AuditService auditService,
-            TimeProvider timeProvider) {
+            TimeProvider timeProvider,
+            PermissionGuard permissionGuard,
+            BranchScopeGuard branchScopeGuard) {
         this.assignmentRuleRepository = assignmentRuleRepository;
         this.assignmentRuleAdvisorRepository = assignmentRuleAdvisorRepository;
         this.unassignedAssignmentItemRepository = unassignedAssignmentItemRepository;
@@ -108,12 +113,14 @@ public class AssignmentRuleService {
         this.currentUserContext = currentUserContext;
         this.auditService = auditService;
         this.timeProvider = timeProvider;
+        this.permissionGuard = permissionGuard;
+        this.branchScopeGuard = branchScopeGuard;
     }
 
     @Transactional(readOnly = true)
     public PageResponse<AssignmentRuleSnapshot> searchRules(AssignmentRuleSearchCommand command) {
         CurrentUser actor = currentUserContext.currentUser();
-        assertAnyPermission(actor, List.of(PermissionCodes.ASSIGNMENT_VIEW, PermissionCodes.ASSIGNMENT_MANAGE), "ASSIGNMENT_VIEW_DENIED", "Permission is required to view assignment rules");
+        permissionGuard.requireAnyPermission(actor, List.of(PermissionCodes.ASSIGNMENT_VIEW, PermissionCodes.ASSIGNMENT_MANAGE), "ASSIGNMENT_VIEW_DENIED", "Permission is required to view assignment rules");
         UUID tenantId = TenantContext.requireTenantId(actor);
         UUID branchId = command == null ? null : command.branchId();
         assertBranchScope(actor, branchId, false);
@@ -137,7 +144,7 @@ public class AssignmentRuleService {
     @Transactional(readOnly = true)
     public AssignmentRuleSnapshot getRule(UUID assignmentRuleId) {
         CurrentUser actor = currentUserContext.currentUser();
-        assertAnyPermission(actor, List.of(PermissionCodes.ASSIGNMENT_VIEW, PermissionCodes.ASSIGNMENT_MANAGE), "ASSIGNMENT_VIEW_DENIED", "Permission is required to view assignment rules");
+        permissionGuard.requireAnyPermission(actor, List.of(PermissionCodes.ASSIGNMENT_VIEW, PermissionCodes.ASSIGNMENT_MANAGE), "ASSIGNMENT_VIEW_DENIED", "Permission is required to view assignment rules");
         UUID tenantId = TenantContext.requireTenantId(actor);
         AssignmentRule rule = findRule(tenantId, assignmentRuleId);
         assertBranchScope(actor, rule.branchId(), false);
@@ -147,7 +154,7 @@ public class AssignmentRuleService {
     @Transactional
     public AssignmentRuleSnapshot createRule(CreateAssignmentRuleRequest request) {
         CurrentUser actor = currentUserContext.currentUser();
-        assertPermission(actor, PermissionCodes.ASSIGNMENT_MANAGE, "ASSIGNMENT_MANAGE_DENIED", "Permission is required to manage assignment rules");
+        permissionGuard.requirePermission(actor, PermissionCodes.ASSIGNMENT_MANAGE, "ASSIGNMENT_MANAGE_DENIED", "Permission is required to manage assignment rules");
         UUID tenantId = TenantContext.requireTenantId(actor);
         RuleDefinition definition = resolveCreateDefinition(tenantId, request);
         assertBranchScope(actor, definition.branchId(), true);
@@ -177,7 +184,7 @@ public class AssignmentRuleService {
     @Transactional
     public AssignmentRuleSnapshot updateRule(UUID assignmentRuleId, UpdateAssignmentRuleRequest request) {
         CurrentUser actor = currentUserContext.currentUser();
-        assertPermission(actor, PermissionCodes.ASSIGNMENT_MANAGE, "ASSIGNMENT_MANAGE_DENIED", "Permission is required to manage assignment rules");
+        permissionGuard.requirePermission(actor, PermissionCodes.ASSIGNMENT_MANAGE, "ASSIGNMENT_MANAGE_DENIED", "Permission is required to manage assignment rules");
         UUID tenantId = TenantContext.requireTenantId(actor);
         AssignmentRule rule = findRule(tenantId, assignmentRuleId);
         assertBranchScope(actor, rule.branchId(), true);
@@ -209,7 +216,7 @@ public class AssignmentRuleService {
     @Transactional(readOnly = true)
     public PageResponse<UnassignedAssignmentItemSnapshot> searchUnassignedItems(UnassignedAssignmentItemSearchCommand command) {
         CurrentUser actor = currentUserContext.currentUser();
-        assertAnyPermission(actor, List.of(PermissionCodes.ASSIGNMENT_VIEW, PermissionCodes.ASSIGNMENT_MANAGE), "ASSIGNMENT_VIEW_DENIED", "Permission is required to view unassigned queue");
+        permissionGuard.requireAnyPermission(actor, List.of(PermissionCodes.ASSIGNMENT_VIEW, PermissionCodes.ASSIGNMENT_MANAGE), "ASSIGNMENT_VIEW_DENIED", "Permission is required to view unassigned queue");
         UUID tenantId = TenantContext.requireTenantId(actor);
         UUID branchId = command == null ? null : command.branchId();
         assertBranchScope(actor, branchId, false);
@@ -456,22 +463,10 @@ public class AssignmentRuleService {
     }
 
     private void assertBranchScope(CurrentUser actor, UUID branchId, boolean managing) {
-        if (!ROLE_SALES_LEAD.equals(actor.roleCode())) {
-            return;
-        }
-        if (branchId == null) {
-            String message = managing
-                    ? "Sales Lead can only manage branch assignment rules"
-                    : "Sales Lead must specify a branch to view assignment data";
-            throw BusinessException.forbidden("branch_id", "BRANCH_SCOPE_REQUIRED", message);
-        }
-        boolean assigned = userBranchRepository
-                .findByTenantIdAndUserIdAndStatus(actor.tenantId(), actor.actorId(), UserBranchStatus.ACTIVE)
-                .stream()
-                .anyMatch(userBranch -> branchId.equals(userBranch.branchId()));
-        if (!assigned) {
-            throw BusinessException.forbidden("branch_id", "OUT_OF_SCOPE", "Branch is outside the actor scope");
-        }
+        String message = managing
+                ? "Sales Lead can only manage branch assignment rules"
+                : "Sales Lead must specify a branch to view assignment data";
+        branchScopeGuard.requireAssignedBranchForSalesLead(actor, branchId, message);
     }
 
     private String requireRuleName(String ruleName) {
@@ -540,20 +535,6 @@ public class AssignmentRuleService {
             throw ValidationException.of("status", "INVALID", "Unassigned item status is invalid");
         }
     }
-
-    private void assertPermission(CurrentUser actor, String permissionCode, String detailCode, String message) {
-        if (actor == null || !actor.hasPermission(permissionCode)) {
-            throw BusinessException.forbidden("permission", detailCode, message);
-        }
-    }
-
-    private void assertAnyPermission(CurrentUser actor, List<String> permissionCodes, String detailCode, String message) {
-        if (actor == null || permissionCodes.stream().noneMatch(actor::hasPermission)) {
-            throw BusinessException.forbidden("permission", detailCode, message);
-        }
-    }
-
-
 
     private String normalizeOptional(String value) {
         if (!StringUtils.hasText(value)) {

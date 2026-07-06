@@ -25,6 +25,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import vn.mar.audit.model.AuditActions;
 import vn.mar.audit.service.AuditRecordCommand;
 import vn.mar.audit.service.AuditService;
+import vn.mar.authz.service.PermissionGuard;
 import vn.mar.branch.entity.Branch;
 import vn.mar.branch.model.BranchStatus;
 import vn.mar.branch.repository.BranchRepository;
@@ -156,7 +157,8 @@ class AdmissionOpportunityServiceTest {
                 slaTaskManagementService,
                 timeProvider,
                 currentUserContext,
-                auditService
+                auditService,
+                new PermissionGuard()
         );
     }
 

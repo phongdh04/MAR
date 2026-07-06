@@ -38,6 +38,7 @@ import vn.mar.assignment.repository.AssignmentRuleRepository;
 import vn.mar.assignment.repository.UnassignedAssignmentItemRepository;
 import vn.mar.audit.service.AuditService;
 import vn.mar.authz.model.PermissionCodes;
+import vn.mar.authz.service.BranchScopeGuard;
 import vn.mar.common.time.TimeProvider;
 import vn.mar.opportunity.api.AssignOpportunityOwnerCommand;
 import vn.mar.opportunity.api.OpportunityAssignmentService;
@@ -118,7 +119,8 @@ class DefaultAssignmentEngineServiceTest {
                 userBranchRepository,
                 currentUserContext,
                 auditService,
-                timeProvider
+                timeProvider,
+                new BranchScopeGuard(userBranchRepository)
         );
     }
 

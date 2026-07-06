@@ -22,6 +22,7 @@ import vn.mar.audit.model.AuditResourceTypes;
 import vn.mar.audit.service.AuditRecordCommand;
 import vn.mar.audit.service.AuditService;
 import vn.mar.authz.model.PermissionCodes;
+import vn.mar.authz.service.PermissionGuard;
 import vn.mar.branch.entity.Branch;
 import vn.mar.branch.model.BranchStatus;
 import vn.mar.branch.repository.BranchRepository;
@@ -137,6 +138,7 @@ public class AdmissionOpportunityService implements AdmissionOpportunityManageme
     private final TimeProvider timeProvider;
     private final CurrentUserContext currentUserContext;
     private final AuditService auditService;
+    private final PermissionGuard permissionGuard;
 
     public AdmissionOpportunityService(
             AdmissionOpportunityRepository admissionOpportunityRepository,
@@ -154,7 +156,8 @@ public class AdmissionOpportunityService implements AdmissionOpportunityManageme
             SlaTaskManagementService slaTaskManagementService,
             TimeProvider timeProvider,
             CurrentUserContext currentUserContext,
-            AuditService auditService) {
+            AuditService auditService,
+            PermissionGuard permissionGuard) {
         this.admissionOpportunityRepository = admissionOpportunityRepository;
         this.touchpointRepository = touchpointRepository;
         this.stageHistoryRepository = stageHistoryRepository;
@@ -171,6 +174,7 @@ public class AdmissionOpportunityService implements AdmissionOpportunityManageme
         this.timeProvider = timeProvider;
         this.currentUserContext = currentUserContext;
         this.auditService = auditService;
+        this.permissionGuard = permissionGuard;
     }
 
     @Override
@@ -233,7 +237,7 @@ public class AdmissionOpportunityService implements AdmissionOpportunityManageme
             throw ValidationException.of("command", "REQUIRED", "Opportunity search command is required");
         }
         CurrentUser actor = currentUserContext.currentUser();
-        assertAnyPermission(actor, List.of(PermissionCodes.LEAD_VIEW, PermissionCodes.OPPORTUNITY_UPDATE), "OPPORTUNITY_VIEW_DENIED", "Permission is required to view opportunities");
+        permissionGuard.requireAnyPermission(actor, List.of(PermissionCodes.LEAD_VIEW, PermissionCodes.OPPORTUNITY_UPDATE), "OPPORTUNITY_VIEW_DENIED", "Permission is required to view opportunities");
         UUID tenantId = TenantContext.requireTenantId(actor);
         UUID ownerId = resolveSearchOwner(actor, command.ownerId());
         OpportunityStage stage = resolveStage(command.stage());
@@ -254,7 +258,7 @@ public class AdmissionOpportunityService implements AdmissionOpportunityManageme
     @Transactional(readOnly = true)
     public AdmissionOpportunitySnapshot getOpportunity(UUID opportunityId) {
         CurrentUser actor = currentUserContext.currentUser();
-        assertAnyPermission(actor, List.of(PermissionCodes.LEAD_VIEW, PermissionCodes.OPPORTUNITY_UPDATE), "OPPORTUNITY_VIEW_DENIED", "Permission is required to view opportunities");
+        permissionGuard.requireAnyPermission(actor, List.of(PermissionCodes.LEAD_VIEW, PermissionCodes.OPPORTUNITY_UPDATE), "OPPORTUNITY_VIEW_DENIED", "Permission is required to view opportunities");
         AdmissionOpportunity opportunity = findOpportunity(TenantContext.requireTenantId(actor), opportunityId);
         assertOpportunityVisibleToActor(actor, opportunity);
         return admissionOpportunityMapper.toSnapshot(opportunity);
@@ -264,7 +268,7 @@ public class AdmissionOpportunityService implements AdmissionOpportunityManageme
     @Transactional(readOnly = true)
     public List<StageHistorySnapshot> getStageHistory(UUID opportunityId) {
         CurrentUser actor = currentUserContext.currentUser();
-        assertAnyPermission(actor, List.of(PermissionCodes.LEAD_VIEW, PermissionCodes.OPPORTUNITY_UPDATE), "OPPORTUNITY_VIEW_DENIED", "Permission is required to view opportunity stage history");
+        permissionGuard.requireAnyPermission(actor, List.of(PermissionCodes.LEAD_VIEW, PermissionCodes.OPPORTUNITY_UPDATE), "OPPORTUNITY_VIEW_DENIED", "Permission is required to view opportunity stage history");
         UUID tenantId = TenantContext.requireTenantId(actor);
         AdmissionOpportunity opportunity = findOpportunity(tenantId, opportunityId);
         assertOpportunityVisibleToActor(actor, opportunity);
@@ -280,7 +284,7 @@ public class AdmissionOpportunityService implements AdmissionOpportunityManageme
     public OpportunityActivitySnapshot createActivity(CreateOpportunityActivityCommand command) {
         validateCreateActivityCommand(command);
         CurrentUser actor = currentUserContext.currentUser();
-        assertPermission(actor, PermissionCodes.ACTIVITY_CREATE, "ACTIVITY_CREATE_DENIED", "Permission is required to create opportunity activities");
+        permissionGuard.requirePermission(actor, PermissionCodes.ACTIVITY_CREATE, "ACTIVITY_CREATE_DENIED", "Permission is required to create opportunity activities");
         UUID tenantId = TenantContext.requireTenantId(actor);
         AdmissionOpportunity opportunity = findOpportunity(tenantId, command.opportunityId());
         assertOpportunityVisibleToActor(actor, opportunity);
@@ -327,7 +331,7 @@ public class AdmissionOpportunityService implements AdmissionOpportunityManageme
             throw ValidationException.of("command", "REQUIRED", "Opportunity activity search command is required");
         }
         CurrentUser actor = currentUserContext.currentUser();
-        assertPermission(actor, PermissionCodes.ACTIVITY_VIEW, "ACTIVITY_VIEW_DENIED", "Permission is required to view opportunity activities");
+        permissionGuard.requirePermission(actor, PermissionCodes.ACTIVITY_VIEW, "ACTIVITY_VIEW_DENIED", "Permission is required to view opportunity activities");
         UUID tenantId = TenantContext.requireTenantId(actor);
         AdmissionOpportunity opportunity = findOpportunity(tenantId, command.opportunityId());
         assertOpportunityVisibleToActor(actor, opportunity);
@@ -346,7 +350,7 @@ public class AdmissionOpportunityService implements AdmissionOpportunityManageme
     public AdmissionOpportunitySnapshot updateOpportunity(UpdateAdmissionOpportunityCommand command) {
         validateUpdateCommand(command);
         CurrentUser actor = currentUserContext.currentUser();
-        assertPermission(actor, PermissionCodes.OPPORTUNITY_UPDATE, "OPPORTUNITY_UPDATE_DENIED", "Permission is required to update opportunities");
+        permissionGuard.requirePermission(actor, PermissionCodes.OPPORTUNITY_UPDATE, "OPPORTUNITY_UPDATE_DENIED", "Permission is required to update opportunities");
         UUID tenantId = TenantContext.requireTenantId(actor);
         AdmissionOpportunity opportunity = findOpportunity(tenantId, command.opportunityId());
         assertOpportunityVisibleToActor(actor, opportunity);
@@ -381,7 +385,7 @@ public class AdmissionOpportunityService implements AdmissionOpportunityManageme
     public StageChangeSnapshot changeStage(ChangeOpportunityStageCommand command) {
         validateChangeStageCommand(command);
         CurrentUser actor = currentUserContext.currentUser();
-        assertPermission(actor, PermissionCodes.OPPORTUNITY_UPDATE, "OPPORTUNITY_UPDATE_DENIED", "Permission is required to update opportunity stage");
+        permissionGuard.requirePermission(actor, PermissionCodes.OPPORTUNITY_UPDATE, "OPPORTUNITY_UPDATE_DENIED", "Permission is required to update opportunity stage");
         UUID tenantId = TenantContext.requireTenantId(actor);
         AdmissionOpportunity opportunity = findOpportunity(tenantId, command.opportunityId());
         assertOpportunityVisibleToActor(actor, opportunity);
@@ -905,20 +909,6 @@ public class AdmissionOpportunityService implements AdmissionOpportunityManageme
         long seconds = Duration.between(previousChangedAt, changedAt).getSeconds();
         return Math.max(seconds, 0L);
     }
-
-    private void assertPermission(CurrentUser actor, String permissionCode, String detailCode, String message) {
-        if (actor == null || !actor.hasPermission(permissionCode)) {
-            throw BusinessException.forbidden("permission", detailCode, message);
-        }
-    }
-
-    private void assertAnyPermission(CurrentUser actor, List<String> permissionCodes, String detailCode, String message) {
-        if (actor == null || permissionCodes.stream().noneMatch(actor::hasPermission)) {
-            throw BusinessException.forbidden("permission", detailCode, message);
-        }
-    }
-
-
 
     private Sort newestFirstSort() {
         return Sort.by(Sort.Direction.DESC, "createdAt");

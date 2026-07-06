@@ -27,6 +27,7 @@ import vn.mar.audit.model.AuditResourceTypes;
 import vn.mar.audit.service.AuditRecordCommand;
 import vn.mar.audit.service.AuditService;
 import vn.mar.authz.model.PermissionCodes;
+import vn.mar.authz.service.BranchScopeGuard;
 import vn.mar.branch.repository.BranchRepository;
 import vn.mar.common.error.ErrorCode;
 import vn.mar.common.error.ErrorDetail;
@@ -59,8 +60,6 @@ import vn.mar.sla.repository.SlaPolicyRepository;
 import vn.mar.sla.repository.WorkingHoursConfigRepository;
 import vn.mar.tenant.entity.Tenant;
 import vn.mar.tenant.repository.TenantRepository;
-import vn.mar.userbranch.model.UserBranchStatus;
-import vn.mar.userbranch.repository.UserBranchRepository;
 
 @Service
 public class SlaSettingsService implements SlaPolicyLookupService {
@@ -76,34 +75,33 @@ public class SlaSettingsService implements SlaPolicyLookupService {
     private static final String SOURCE_BRANCH = "BRANCH";
     private static final String SOURCE_TENANT = "TENANT";
     private static final String SOURCE_DEFAULT = "DEFAULT";
-    private static final String ROLE_SALES_LEAD = "SALES_LEAD";
 
     private final WorkingHoursConfigRepository workingHoursConfigRepository;
     private final SlaPolicyRepository slaPolicyRepository;
     private final TenantRepository tenantRepository;
     private final BranchRepository branchRepository;
-    private final UserBranchRepository userBranchRepository;
     private final CurrentUserContext currentUserContext;
     private final AuditService auditService;
     private final TimeProvider timeProvider;
+    private final BranchScopeGuard branchScopeGuard;
 
     public SlaSettingsService(
             WorkingHoursConfigRepository workingHoursConfigRepository,
             SlaPolicyRepository slaPolicyRepository,
             TenantRepository tenantRepository,
             BranchRepository branchRepository,
-            UserBranchRepository userBranchRepository,
             CurrentUserContext currentUserContext,
             AuditService auditService,
-            TimeProvider timeProvider) {
+            TimeProvider timeProvider,
+            BranchScopeGuard branchScopeGuard) {
         this.workingHoursConfigRepository = workingHoursConfigRepository;
         this.slaPolicyRepository = slaPolicyRepository;
         this.tenantRepository = tenantRepository;
         this.branchRepository = branchRepository;
-        this.userBranchRepository = userBranchRepository;
         this.currentUserContext = currentUserContext;
         this.auditService = auditService;
         this.timeProvider = timeProvider;
+        this.branchScopeGuard = branchScopeGuard;
     }
 
     @Transactional(readOnly = true)
@@ -618,22 +616,10 @@ public class SlaSettingsService implements SlaPolicyLookupService {
     }
 
     private void assertBranchScope(CurrentUser actor, UUID branchId, boolean managing) {
-        if (!ROLE_SALES_LEAD.equals(actor.roleCode())) {
-            return;
-        }
-        if (branchId == null) {
-            String message = managing
-                    ? "Sales Lead can only manage branch SLA settings"
-                    : "Sales Lead must specify a branch to view SLA settings";
-            throw BusinessException.forbidden("branch_id", "BRANCH_SCOPE_REQUIRED", message);
-        }
-        boolean assigned = userBranchRepository
-                .findByTenantIdAndUserIdAndStatus(actor.tenantId(), actor.actorId(), UserBranchStatus.ACTIVE)
-                .stream()
-                .anyMatch(userBranch -> branchId.equals(userBranch.branchId()));
-        if (!assigned) {
-            throw BusinessException.forbidden("branch_id", "OUT_OF_SCOPE", "Branch is outside the actor scope");
-        }
+        String message = managing
+                ? "Sales Lead can only manage branch SLA settings"
+                : "Sales Lead must specify a branch to view SLA settings";
+        branchScopeGuard.requireAssignedBranchForSalesLead(actor, branchId, message);
     }
 
 

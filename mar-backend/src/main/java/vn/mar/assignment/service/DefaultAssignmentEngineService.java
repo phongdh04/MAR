@@ -37,6 +37,7 @@ import vn.mar.audit.model.AuditResourceTypes;
 import vn.mar.audit.service.AuditRecordCommand;
 import vn.mar.audit.service.AuditService;
 import vn.mar.authz.model.PermissionCodes;
+import vn.mar.authz.service.BranchScopeGuard;
 import vn.mar.common.error.ErrorCode;
 import vn.mar.common.error.ErrorDetail;
 import vn.mar.common.exception.BusinessException;
@@ -63,7 +64,6 @@ public class DefaultAssignmentEngineService implements AssignmentEngineService {
 
     private static final Logger log = LoggerFactory.getLogger(DefaultAssignmentEngineService.class);
     private static final String ROLE_ADVISOR = "ADVISOR";
-    private static final String ROLE_SALES_LEAD = "SALES_LEAD";
 
     private final AssignmentRuleRepository assignmentRuleRepository;
     private final AssignmentRuleAdvisorRepository assignmentRuleAdvisorRepository;
@@ -77,6 +77,7 @@ public class DefaultAssignmentEngineService implements AssignmentEngineService {
     private final CurrentUserContext currentUserContext;
     private final AuditService auditService;
     private final TimeProvider timeProvider;
+    private final BranchScopeGuard branchScopeGuard;
 
     public DefaultAssignmentEngineService(
             AssignmentRuleRepository assignmentRuleRepository,
@@ -90,7 +91,8 @@ public class DefaultAssignmentEngineService implements AssignmentEngineService {
             UserBranchRepository userBranchRepository,
             CurrentUserContext currentUserContext,
             AuditService auditService,
-            TimeProvider timeProvider) {
+            TimeProvider timeProvider,
+            BranchScopeGuard branchScopeGuard) {
         this.assignmentRuleRepository = assignmentRuleRepository;
         this.assignmentRuleAdvisorRepository = assignmentRuleAdvisorRepository;
         this.assignmentPoolStateRepository = assignmentPoolStateRepository;
@@ -103,6 +105,7 @@ public class DefaultAssignmentEngineService implements AssignmentEngineService {
         this.currentUserContext = currentUserContext;
         this.auditService = auditService;
         this.timeProvider = timeProvider;
+        this.branchScopeGuard = branchScopeGuard;
     }
 
     @Override
@@ -425,19 +428,7 @@ public class DefaultAssignmentEngineService implements AssignmentEngineService {
     }
 
     private void assertBranchScope(CurrentUser actor, UUID branchId) {
-        if ("SYSTEM".equals(actor.roleCode()) || !ROLE_SALES_LEAD.equals(actor.roleCode())) {
-            return;
-        }
-        if (branchId == null) {
-            throw BusinessException.forbidden("branch_id", "BRANCH_SCOPE_REQUIRED", "Sales Lead can only assign branch opportunities");
-        }
-        boolean assigned = userBranchRepository
-                .findByTenantIdAndUserIdAndStatus(actor.tenantId(), actor.actorId(), UserBranchStatus.ACTIVE)
-                .stream()
-                .anyMatch(userBranch -> branchId.equals(userBranch.branchId()));
-        if (!assigned) {
-            throw BusinessException.forbidden("branch_id", "OUT_OF_SCOPE", "Branch is outside the actor scope");
-        }
+        branchScopeGuard.requireAssignedBranchForSalesLead(actor, branchId, "Sales Lead can only assign branch opportunities");
     }
 
     private UUID resolveTenantId(CurrentUser actor, UUID requestedTenantId) {

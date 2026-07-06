@@ -21,6 +21,7 @@ import vn.mar.audit.model.AuditResourceTypes;
 import vn.mar.audit.service.AuditRecordCommand;
 import vn.mar.audit.service.AuditService;
 import vn.mar.authz.model.PermissionCodes;
+import vn.mar.authz.service.BranchScopeGuard;
 import vn.mar.branch.repository.BranchRepository;
 import vn.mar.common.error.ErrorCode;
 import vn.mar.common.error.ErrorDetail;
@@ -49,8 +50,6 @@ import vn.mar.sla.model.SlaOverdueLevel;
 import vn.mar.sla.model.SlaTaskStatus;
 import vn.mar.sla.model.SlaTaskType;
 import vn.mar.sla.repository.SlaTaskRepository;
-import vn.mar.userbranch.model.UserBranchStatus;
-import vn.mar.userbranch.repository.UserBranchRepository;
 
 @Service
 public class SlaTaskService implements SlaTaskManagementService {
@@ -64,29 +63,29 @@ public class SlaTaskService implements SlaTaskManagementService {
     private final SlaTaskRepository slaTaskRepository;
     private final SlaPolicyLookupService slaPolicyLookupService;
     private final BranchRepository branchRepository;
-    private final UserBranchRepository userBranchRepository;
     private final CurrentUserContext currentUserContext;
     private final AuditService auditService;
     private final TimeProvider timeProvider;
     private final SlaTaskMapper slaTaskMapper;
+    private final BranchScopeGuard branchScopeGuard;
 
     public SlaTaskService(
             SlaTaskRepository slaTaskRepository,
             SlaPolicyLookupService slaPolicyLookupService,
             BranchRepository branchRepository,
-            UserBranchRepository userBranchRepository,
             CurrentUserContext currentUserContext,
             AuditService auditService,
             TimeProvider timeProvider,
-            SlaTaskMapper slaTaskMapper) {
+            SlaTaskMapper slaTaskMapper,
+            BranchScopeGuard branchScopeGuard) {
         this.slaTaskRepository = slaTaskRepository;
         this.slaPolicyLookupService = slaPolicyLookupService;
         this.branchRepository = branchRepository;
-        this.userBranchRepository = userBranchRepository;
         this.currentUserContext = currentUserContext;
         this.auditService = auditService;
         this.timeProvider = timeProvider;
         this.slaTaskMapper = slaTaskMapper;
+        this.branchScopeGuard = branchScopeGuard;
     }
 
     @Override
@@ -343,19 +342,7 @@ public class SlaTaskService implements SlaTaskManagementService {
     }
 
     private List<UUID> resolveSalesLeadBranchScope(CurrentUser actor, UUID requestedBranchId) {
-        List<UUID> branchIds = userBranchRepository
-                .findByTenantIdAndUserIdAndStatus(actor.tenantId(), actor.actorId(), UserBranchStatus.ACTIVE)
-                .stream()
-                .map(userBranch -> userBranch.branchId())
-                .sorted()
-                .toList();
-        if (requestedBranchId == null) {
-            return branchIds;
-        }
-        if (!branchIds.contains(requestedBranchId)) {
-            throw BusinessException.forbidden("branch_id", "OUT_OF_SCOPE", "Branch is outside the actor scope");
-        }
-        return List.of(requestedBranchId);
+        return branchScopeGuard.resolveAssignedBranchesForSalesLead(actor, requestedBranchId);
     }
 
     private SlaTaskStatus parseStatus(String requestedStatus) {

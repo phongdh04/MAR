@@ -23,6 +23,7 @@ import vn.mar.audit.model.AuditActions;
 import vn.mar.audit.service.AuditRecordCommand;
 import vn.mar.audit.service.AuditService;
 import vn.mar.authz.model.PermissionCodes;
+import vn.mar.authz.service.BranchScopeGuard;
 import vn.mar.branch.repository.BranchRepository;
 import vn.mar.common.error.ErrorCode;
 import vn.mar.common.exception.BusinessException;
@@ -93,7 +94,8 @@ class SlaTaskServiceTest {
                 currentUserContext,
                 auditService,
                 timeProvider,
-                new SlaTaskMapper()
+                new SlaTaskMapper(),
+                new BranchScopeGuard(userBranchRepository)
         );
     }
 

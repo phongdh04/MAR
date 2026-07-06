@@ -26,6 +26,7 @@ import org.springframework.boot.test.system.OutputCaptureExtension;
 import vn.mar.audit.service.AuditRecordCommand;
 import vn.mar.audit.service.AuditService;
 import vn.mar.authz.model.PermissionCodes;
+import vn.mar.authz.service.BranchScopeGuard;
 import vn.mar.branch.repository.BranchRepository;
 import vn.mar.common.error.ErrorCode;
 import vn.mar.common.exception.BusinessException;
@@ -90,10 +91,10 @@ class SlaSettingsServiceTest {
                 slaPolicyRepository,
                 tenantRepository,
                 branchRepository,
-                userBranchRepository,
                 currentUserContext,
                 auditService,
-                timeProvider
+                timeProvider,
+                new BranchScopeGuard(userBranchRepository)
         );
     }
 

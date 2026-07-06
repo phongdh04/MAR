@@ -58,6 +58,7 @@ class FlywayMigrationIT {
             "assignment_pool_states",
             "assignment_histories",
             "unassigned_assignment_items",
+            "integration_events",
             "import_batches",
             "import_rows"
     );
@@ -112,6 +113,10 @@ class FlywayMigrationIT {
                 assertThat(databaseObjectExists(connection, "ux_assignment_pool_states__tenant_rule")).isTrue();
                 assertThat(databaseObjectExists(connection, "ux_unassigned_assignment_items__opportunity_open")).isTrue();
                 assertThat(databaseObjectExists(connection, "ux_sla_tasks__opportunity_type_active")).isTrue();
+                assertThat(databaseObjectExists(connection, "ux_integration_events__tenant_source_external_active")).isTrue();
+                assertThat(databaseObjectExists(connection, "ux_integration_events__tenant_source_idempotency_active")).isTrue();
+                assertThat(databaseObjectExists(connection, "idx_integration_events__tenant_status_received")).isTrue();
+                assertThat(databaseObjectExists(connection, "idx_integration_events__tenant_payload_hash")).isTrue();
                 assertThat(databaseObjectExists(connection, "idx_sla_tasks__tenant_owner_status_due")).isTrue();
                 assertThat(constraintExists(connection, "courses", "ck_courses__tuition_non_negative")).isTrue();
                 assertThat(constraintExists(connection, "merge_history", "ck_merge_history__customers_different")).isTrue();
@@ -124,6 +129,8 @@ class FlywayMigrationIT {
                 assertThat(constraintExists(connection, "assignment_histories", "ck_assignment_histories__source")).isTrue();
                 assertThat(constraintExists(connection, "unassigned_assignment_items", "ck_unassigned_assignment_items__reason")).isTrue();
                 assertThat(constraintExists(connection, "sla_tasks", "ck_sla_tasks__completion_state")).isTrue();
+                assertThat(constraintExists(connection, "integration_events", "ck_integration_events__status")).isTrue();
+                assertThat(constraintExists(connection, "integration_events", "ck_integration_events__source_type")).isTrue();
                 assertThat(databaseObjectExists(connection, "idx_import_rows__tenant_batch_status")).isTrue();
                 assertThat(rowExists(connection, "roles", "role_code", "ADVISOR")).isTrue();
                 assertThat(rowExists(connection, "permissions", "function_code", "user.manage")).isTrue();

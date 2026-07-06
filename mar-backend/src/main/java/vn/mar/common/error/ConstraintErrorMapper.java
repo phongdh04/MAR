@@ -51,7 +51,15 @@ public class ConstraintErrorMapper {
             Map.entry("ck_stage_history__from_stage", ErrorCode.VALIDATION_ERROR),
             Map.entry("ck_stage_history__to_stage", ErrorCode.VALIDATION_ERROR),
             Map.entry("ck_stage_history__changed_by_type", ErrorCode.VALIDATION_ERROR),
-            Map.entry("ck_stage_history__duration_non_negative", ErrorCode.VALIDATION_ERROR)
+            Map.entry("ck_stage_history__duration_non_negative", ErrorCode.VALIDATION_ERROR),
+            Map.entry("ux_integration_events__tenant_source_external_active", ErrorCode.DUPLICATE_RESOURCE),
+            Map.entry("ux_integration_events__tenant_source_idempotency_active", ErrorCode.DUPLICATE_RESOURCE),
+            Map.entry("ck_integration_events__source_type", ErrorCode.VALIDATION_ERROR),
+            Map.entry("ck_integration_events__status", ErrorCode.VALIDATION_ERROR),
+            Map.entry("ck_integration_events__external_id_not_blank", ErrorCode.VALIDATION_ERROR),
+            Map.entry("ck_integration_events__idempotency_key_not_blank", ErrorCode.VALIDATION_ERROR),
+            Map.entry("ck_integration_events__payload_hash_not_blank", ErrorCode.VALIDATION_ERROR),
+            Map.entry("ck_integration_events__processed_after_received", ErrorCode.VALIDATION_ERROR)
     );
 
     public Optional<ErrorCode> map(String constraintName) {

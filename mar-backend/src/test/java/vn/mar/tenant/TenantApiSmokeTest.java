@@ -49,6 +49,8 @@ import vn.mar.opportunity.repository.AdmissionOpportunityRepository;
 import vn.mar.opportunity.repository.StageHistoryRepository;
 import vn.mar.opportunity.repository.TouchpointRepository;
 import vn.mar.role.repository.RoleRepository;
+import vn.mar.sla.repository.SlaPolicyRepository;
+import vn.mar.sla.repository.WorkingHoursConfigRepository;
 import vn.mar.security.jwt.JwtTokenProvider;
 import vn.mar.tenant.entity.Tenant;
 import vn.mar.tenant.model.TenantStatus;
@@ -128,6 +130,12 @@ class TenantApiSmokeTest {
 
     @MockitoBean
     private ImportRowRepository importRowRepository;
+
+    @MockitoBean
+    private WorkingHoursConfigRepository workingHoursConfigRepository;
+
+    @MockitoBean
+    private SlaPolicyRepository slaPolicyRepository;
 
     @MockitoBean
     private AuditEventRepository auditEventRepository;

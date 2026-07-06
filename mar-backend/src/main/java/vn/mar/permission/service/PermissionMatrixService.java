@@ -27,6 +27,7 @@ import vn.mar.common.error.ErrorDetail;
 import vn.mar.common.exception.BusinessException;
 import vn.mar.common.exception.ValidationException;
 import vn.mar.common.logging.LogContext;
+import vn.mar.common.tenant.TenantContext;
 import vn.mar.common.time.TimeProvider;
 import vn.mar.permission.dto.request.PermissionMatrixChangeRequest;
 import vn.mar.permission.dto.request.UpdatePermissionMatrixRequest;
@@ -76,14 +77,14 @@ public class PermissionMatrixService {
 
     @Transactional(readOnly = true)
     public PermissionMatrixResponse getMatrix() {
-        UUID tenantId = requireTenantContext(currentUserContext.currentUser());
+        UUID tenantId = TenantContext.requireTenantId(currentUserContext.currentUser());
         return toMatrixResponse(tenantId, permissionProfileRepository.findByTenantId(tenantId));
     }
 
     @Transactional
     public PermissionMatrixResponse updateMatrix(UpdatePermissionMatrixRequest request) {
         CurrentUser actor = currentUserContext.currentUser();
-        UUID tenantId = requireTenantContext(actor);
+        UUID tenantId = TenantContext.requireTenantId(actor);
         String reason = requireReason(request.reason());
         List<PermissionMatrixChangeRequest> changes = requireChanges(request.changes());
         Instant now = timeProvider.now();
@@ -170,13 +171,13 @@ public class PermissionMatrixService {
 
     private String resolveActiveRole(String requestedRole) {
         if (!StringUtils.hasText(requestedRole)) {
-            throw validation("role", "REQUIRED", "Role is required");
+            throw ValidationException.of("role", "REQUIRED", "Role is required");
         }
         String roleCode = requestedRole.trim().toUpperCase(Locale.ROOT);
         try {
             RoleCode.valueOf(roleCode);
         } catch (IllegalArgumentException exception) {
-            throw validation("role", "INVALID_ROLE", "Role is invalid");
+            throw ValidationException.of("role", "INVALID_ROLE", "Role is invalid");
         }
         if (!roleRepository.existsByRoleCodeAndStatus(roleCode, RoleStatus.ACTIVE)) {
             throw new BusinessException(ErrorCode.INVALID_PARENT_STATUS, "Role is inactive or not found");
@@ -186,26 +187,26 @@ public class PermissionMatrixService {
 
     private String resolveActiveFunctionCode(String requestedFunctionCode) {
         if (!StringUtils.hasText(requestedFunctionCode)) {
-            throw validation("function_code", "REQUIRED", "Function code is required");
+            throw ValidationException.of("function_code", "REQUIRED", "Function code is required");
         }
         String functionCode = requestedFunctionCode.trim().toLowerCase(Locale.ROOT);
         if (!functionCode.matches("^[a-z0-9]+(\\.[a-z0-9_]+)+$")) {
-            throw validation("function_code", "INVALID_FORMAT", "Function code is invalid");
+            throw ValidationException.of("function_code", "INVALID_FORMAT", "Function code is invalid");
         }
         if (!permissionProfileRepository.existsActiveFunctionCode(functionCode)) {
-            throw validation("function_code", "UNKNOWN_PERMISSION", "Permission code is not active");
+            throw ValidationException.of("function_code", "UNKNOWN_PERMISSION", "Permission code is not active");
         }
         return functionCode;
     }
 
     private PermissionAccessLevel resolveAccessLevel(String requestedAccessLevel) {
         if (!StringUtils.hasText(requestedAccessLevel)) {
-            throw validation("access_level", "REQUIRED", "Access level is required");
+            throw ValidationException.of("access_level", "REQUIRED", "Access level is required");
         }
         try {
             return PermissionAccessLevel.valueOf(requestedAccessLevel.trim().toUpperCase(Locale.ROOT));
         } catch (IllegalArgumentException exception) {
-            throw validation("access_level", "INVALID_ACCESS_LEVEL", "Access level is invalid");
+            throw ValidationException.of("access_level", "INVALID_ACCESS_LEVEL", "Access level is invalid");
         }
     }
 
@@ -217,12 +218,12 @@ public class PermissionMatrixService {
             return PermissionScope.TENANT;
         }
         if (!StringUtils.hasText(requestedScope)) {
-            throw validation("scope", "INVALID_SCOPE", "Scope is invalid");
+            throw ValidationException.of("scope", "INVALID_SCOPE", "Scope is invalid");
         }
         try {
             return PermissionScope.valueOf(requestedScope.trim().toUpperCase(Locale.ROOT));
         } catch (IllegalArgumentException exception) {
-            throw validation("scope", "INVALID_SCOPE", "Scope is invalid");
+            throw ValidationException.of("scope", "INVALID_SCOPE", "Scope is invalid");
         }
     }
 
@@ -247,24 +248,18 @@ public class PermissionMatrixService {
 
     private List<PermissionMatrixChangeRequest> requireChanges(List<PermissionMatrixChangeRequest> changes) {
         if (changes == null || changes.isEmpty()) {
-            throw validation("changes", "REQUIRED", "At least one permission change is required");
+            throw ValidationException.of("changes", "REQUIRED", "At least one permission change is required");
         }
         return changes;
     }
 
     private String requireReason(String reason) {
         if (!StringUtils.hasText(reason)) {
-            throw validation("reason", "REQUIRED", "Permission change reason is required");
+            throw ValidationException.of("reason", "REQUIRED", "Permission change reason is required");
         }
         return reason.trim();
     }
 
-    private UUID requireTenantContext(CurrentUser actor) {
-        if (actor.tenantId() == null) {
-            throw new BusinessException(ErrorCode.BUSINESS_RULE_VIOLATION, "Tenant context is required");
-        }
-        return actor.tenantId();
-    }
 
     private void auditPermissionChange(
             CurrentUser actor,
@@ -301,10 +296,4 @@ public class PermissionMatrixService {
         return new BusinessException(ErrorCode.INVALID_PERMISSION_GUARDRAIL, message);
     }
 
-    private ValidationException validation(String field, String code, String message) {
-        return new ValidationException(
-                ErrorCode.VALIDATION_ERROR.defaultMessage(),
-                List.of(ErrorDetail.of(field, code, message))
-        );
-    }
 }

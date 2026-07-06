@@ -408,10 +408,10 @@ public class DefaultAssignmentEngineService implements AssignmentEngineService {
 
     private void validateCommand(AssignOpportunityCommand command) {
         if (command == null) {
-            throw validation("command", "REQUIRED", "Assignment command is required");
+            throw ValidationException.of("command", "REQUIRED", "Assignment command is required");
         }
         if (command.opportunityId() == null) {
-            throw validation("opportunity_id", "REQUIRED", "Opportunity id is required");
+            throw ValidationException.of("opportunity_id", "REQUIRED", "Opportunity id is required");
         }
     }
 
@@ -420,7 +420,7 @@ public class DefaultAssignmentEngineService implements AssignmentEngineService {
             return;
         }
         if (!actor.hasPermission(PermissionCodes.ASSIGNMENT_MANAGE)) {
-            throw forbidden("permission", "ASSIGNMENT_MANAGE_DENIED", "Permission is required to trigger assignment");
+            throw BusinessException.forbidden("permission", "ASSIGNMENT_MANAGE_DENIED", "Permission is required to trigger assignment");
         }
     }
 
@@ -429,14 +429,14 @@ public class DefaultAssignmentEngineService implements AssignmentEngineService {
             return;
         }
         if (branchId == null) {
-            throw forbidden("branch_id", "BRANCH_SCOPE_REQUIRED", "Sales Lead can only assign branch opportunities");
+            throw BusinessException.forbidden("branch_id", "BRANCH_SCOPE_REQUIRED", "Sales Lead can only assign branch opportunities");
         }
         boolean assigned = userBranchRepository
                 .findByTenantIdAndUserIdAndStatus(actor.tenantId(), actor.actorId(), UserBranchStatus.ACTIVE)
                 .stream()
                 .anyMatch(userBranch -> branchId.equals(userBranch.branchId()));
         if (!assigned) {
-            throw forbidden("branch_id", "OUT_OF_SCOPE", "Branch is outside the actor scope");
+            throw BusinessException.forbidden("branch_id", "OUT_OF_SCOPE", "Branch is outside the actor scope");
         }
     }
 
@@ -446,7 +446,7 @@ public class DefaultAssignmentEngineService implements AssignmentEngineService {
             throw new BusinessException(ErrorCode.BUSINESS_RULE_VIOLATION, "Tenant context is required");
         }
         if (actor.tenantId() != null && !actor.tenantId().equals(tenantId)) {
-            throw forbidden("tenant_id", "TENANT_MISMATCH", "Tenant is outside the actor context");
+            throw BusinessException.forbidden("tenant_id", "TENANT_MISMATCH", "Tenant is outside the actor context");
         }
         return tenantId;
     }
@@ -506,18 +506,5 @@ public class DefaultAssignmentEngineService implements AssignmentEngineService {
         ));
     }
 
-    private BusinessException forbidden(String field, String code, String message) {
-        return new BusinessException(
-                ErrorCode.PERMISSION_DENIED,
-                message,
-                List.of(ErrorDetail.of(field, code, message))
-        );
-    }
 
-    private ValidationException validation(String field, String code, String message) {
-        return new ValidationException(
-                ErrorCode.VALIDATION_ERROR.defaultMessage(),
-                List.of(ErrorDetail.of(field, code, message))
-        );
-    }
 }

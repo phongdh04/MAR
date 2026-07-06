@@ -33,6 +33,7 @@ import vn.mar.common.error.ErrorDetail;
 import vn.mar.common.exception.BusinessException;
 import vn.mar.common.exception.ValidationException;
 import vn.mar.common.logging.LogContext;
+import vn.mar.common.tenant.TenantContext;
 import vn.mar.common.time.TimeProvider;
 import vn.mar.lead.model.LeadTemperature;
 import vn.mar.security.context.CurrentUser;
@@ -108,7 +109,7 @@ public class SlaSettingsService implements SlaPolicyLookupService {
     @Transactional(readOnly = true)
     public WorkingHoursConfigResponse getWorkingHours(UUID branchId) {
         CurrentUser actor = currentUserContext.currentUser();
-        UUID tenantId = requireTenantContext(actor);
+        UUID tenantId = TenantContext.requireTenantId(actor);
         assertCanViewSlaSettings(actor, branchId);
         if (branchId != null) {
             ensureBranchBelongsToTenant(tenantId, branchId);
@@ -119,7 +120,7 @@ public class SlaSettingsService implements SlaPolicyLookupService {
     @Transactional
     public WorkingHoursConfigResponse updateWorkingHours(UpdateWorkingHoursRequest request) {
         CurrentUser actor = currentUserContext.currentUser();
-        UUID tenantId = requireTenantContext(actor);
+        UUID tenantId = TenantContext.requireTenantId(actor);
         UUID branchId = request.branchId();
         assertCanManageSlaSettings(actor, branchId);
         if (branchId != null) {
@@ -170,7 +171,7 @@ public class SlaSettingsService implements SlaPolicyLookupService {
     @Transactional(readOnly = true)
     public SlaPoliciesResponse getSlaPolicies(UUID branchId) {
         CurrentUser actor = currentUserContext.currentUser();
-        UUID tenantId = requireTenantContext(actor);
+        UUID tenantId = TenantContext.requireTenantId(actor);
         assertCanViewSlaSettings(actor, branchId);
         if (branchId != null) {
             ensureBranchBelongsToTenant(tenantId, branchId);
@@ -181,7 +182,7 @@ public class SlaSettingsService implements SlaPolicyLookupService {
     @Transactional
     public SlaPoliciesResponse updateSlaPolicies(UpdateSlaPoliciesRequest request) {
         CurrentUser actor = currentUserContext.currentUser();
-        UUID tenantId = requireTenantContext(actor);
+        UUID tenantId = TenantContext.requireTenantId(actor);
         UUID branchId = request.branchId();
         assertCanManageSlaSettings(actor, branchId);
         if (branchId != null) {
@@ -229,7 +230,7 @@ public class SlaSettingsService implements SlaPolicyLookupService {
     @Transactional(readOnly = true)
     public DueTimeCalculationResult calculateFirstResponseDueAt(DueTimeCalculationCommand command) {
         if (command == null) {
-            throw validation("command", "REQUIRED", "SLA calculation command is required");
+            throw ValidationException.of("command", "REQUIRED", "SLA calculation command is required");
         }
         UUID tenantId = requireId(command.tenantId(), "tenant_id", "Tenant is required");
         Instant occurredAt = requireInstant(command.occurredAt(), "occurred_at", "Occurred time is required");
@@ -479,19 +480,19 @@ public class SlaSettingsService implements SlaPolicyLookupService {
 
     private Map<DayOfWeek, WorkingHoursDayRequest> validateWorkingHoursDays(List<WorkingHoursDayRequest> days) {
         if (days == null || days.size() != DayOfWeek.values().length) {
-            throw validation("days", "INVALID_SIZE", "Exactly seven working-hour days are required");
+            throw ValidationException.of("days", "INVALID_SIZE", "Exactly seven working-hour days are required");
         }
         Map<DayOfWeek, WorkingHoursDayRequest> byWeekday = new EnumMap<>(DayOfWeek.class);
         for (WorkingHoursDayRequest day : days) {
             DayOfWeek weekday = parseWeekday(day.weekday());
             if (byWeekday.putIfAbsent(weekday, day) != null) {
-                throw validation("days", "DUPLICATE_WEEKDAY", "Weekday must be unique");
+                throw ValidationException.of("days", "DUPLICATE_WEEKDAY", "Weekday must be unique");
             }
             validateWorkingHoursDay(day, weekday);
         }
         for (DayOfWeek weekday : DayOfWeek.values()) {
             if (!byWeekday.containsKey(weekday)) {
-                throw validation("days", "MISSING_WEEKDAY", "Every weekday must be configured");
+                throw ValidationException.of("days", "MISSING_WEEKDAY", "Every weekday must be configured");
             }
         }
         return byWeekday;
@@ -500,31 +501,31 @@ public class SlaSettingsService implements SlaPolicyLookupService {
     private void validateWorkingHoursDay(WorkingHoursDayRequest day, DayOfWeek weekday) {
         if (Boolean.TRUE.equals(day.workingDay())) {
             if (day.startTime() == null || day.endTime() == null) {
-                throw validation(weekday.name().toLowerCase(Locale.ROOT), "WORKING_TIME_REQUIRED", "Working day requires start time and end time");
+                throw ValidationException.of(weekday.name().toLowerCase(Locale.ROOT), "WORKING_TIME_REQUIRED", "Working day requires start time and end time");
             }
             if (!day.startTime().isBefore(day.endTime())) {
-                throw validation(weekday.name().toLowerCase(Locale.ROOT), "INVALID_TIME_RANGE", "Start time must be before end time");
+                throw ValidationException.of(weekday.name().toLowerCase(Locale.ROOT), "INVALID_TIME_RANGE", "Start time must be before end time");
             }
         }
     }
 
     private Map<SlaPolicyType, SlaPolicyItemRequest> validateSlaPolicies(List<SlaPolicyItemRequest> policies) {
         if (policies == null || policies.size() != SlaPolicyType.values().length) {
-            throw validation("policies", "INVALID_SIZE", "Exactly three SLA policies are required");
+            throw ValidationException.of("policies", "INVALID_SIZE", "Exactly three SLA policies are required");
         }
         Map<SlaPolicyType, SlaPolicyItemRequest> byType = new EnumMap<>(SlaPolicyType.class);
         for (SlaPolicyItemRequest policy : policies) {
             SlaPolicyType policyType = parseSlaPolicyType(policy.policyType());
             if (policy.responseDueMinutes() == null) {
-                throw validation(policyType.name().toLowerCase(Locale.ROOT), "REQUIRED", "Response due minutes are required");
+                throw ValidationException.of(policyType.name().toLowerCase(Locale.ROOT), "REQUIRED", "Response due minutes are required");
             }
             if (byType.putIfAbsent(policyType, policy) != null) {
-                throw validation("policies", "DUPLICATE_POLICY_TYPE", "SLA policy type must be unique");
+                throw ValidationException.of("policies", "DUPLICATE_POLICY_TYPE", "SLA policy type must be unique");
             }
         }
         for (SlaPolicyType policyType : SlaPolicyType.values()) {
             if (!byType.containsKey(policyType)) {
-                throw validation("policies", "MISSING_POLICY_TYPE", "Every SLA policy type must be configured");
+                throw ValidationException.of("policies", "MISSING_POLICY_TYPE", "Every SLA policy type must be configured");
             }
         }
         return byType;
@@ -558,60 +559,60 @@ public class SlaSettingsService implements SlaPolicyLookupService {
 
     private DayOfWeek parseWeekday(String value) {
         if (!StringUtils.hasText(value)) {
-            throw validation("weekday", "REQUIRED", "Weekday is required");
+            throw ValidationException.of("weekday", "REQUIRED", "Weekday is required");
         }
         try {
             return DayOfWeek.valueOf(value.trim().toUpperCase(Locale.ROOT));
         } catch (IllegalArgumentException exception) {
-            throw validation("weekday", "INVALID", "Weekday is invalid");
+            throw ValidationException.of("weekday", "INVALID", "Weekday is invalid");
         }
     }
 
     private SlaPolicyType parseSlaPolicyType(String value) {
         if (!StringUtils.hasText(value)) {
-            throw validation("policy_type", "REQUIRED", "SLA policy type is required");
+            throw ValidationException.of("policy_type", "REQUIRED", "SLA policy type is required");
         }
         try {
             return SlaPolicyType.valueOf(value.trim().toUpperCase(Locale.ROOT));
         } catch (IllegalArgumentException exception) {
-            throw validation("policy_type", "INVALID", "SLA policy type is invalid");
+            throw ValidationException.of("policy_type", "INVALID", "SLA policy type is invalid");
         }
     }
 
     private String normalizeTimezone(String timezone) {
         if (!StringUtils.hasText(timezone)) {
-            throw validation("timezone", "REQUIRED", "Timezone is required");
+            throw ValidationException.of("timezone", "REQUIRED", "Timezone is required");
         }
         String normalized = timezone.trim();
         try {
             ZoneId.of(normalized);
             return normalized;
         } catch (RuntimeException exception) {
-            throw validation("timezone", "INVALID", "Timezone is invalid");
+            throw ValidationException.of("timezone", "INVALID", "Timezone is invalid");
         }
     }
 
     private String resolveTenantTimezone(UUID tenantId) {
         Tenant tenant = tenantRepository.findById(tenantId)
-                .orElseThrow(() -> notFound("tenant_id", "Tenant was not found"));
+                .orElseThrow(() -> BusinessException.notFound("tenant_id", "Tenant was not found"));
         return StringUtils.hasText(tenant.timezone()) ? tenant.timezone().trim() : DEFAULT_TIMEZONE;
     }
 
     private void ensureBranchBelongsToTenant(UUID tenantId, UUID branchId) {
         branchRepository.findByIdAndTenantId(branchId, tenantId)
-                .orElseThrow(() -> notFound("branch_id", "Branch was not found"));
+                .orElseThrow(() -> BusinessException.notFound("branch_id", "Branch was not found"));
     }
 
     private void assertCanViewSlaSettings(CurrentUser actor, UUID branchId) {
         if (!actor.hasPermission(PermissionCodes.SLA_VIEW) && !actor.hasPermission(PermissionCodes.SLA_MANAGE)) {
-            throw forbidden("permission", "MISSING_PERMISSION", "SLA view permission is required");
+            throw BusinessException.forbidden("permission", "MISSING_PERMISSION", "SLA view permission is required");
         }
         assertBranchScope(actor, branchId, false);
     }
 
     private void assertCanManageSlaSettings(CurrentUser actor, UUID branchId) {
         if (!actor.hasPermission(PermissionCodes.SLA_MANAGE)) {
-            throw forbidden("permission", "MISSING_PERMISSION", "SLA manage permission is required");
+            throw BusinessException.forbidden("permission", "MISSING_PERMISSION", "SLA manage permission is required");
         }
         assertBranchScope(actor, branchId, true);
     }
@@ -624,34 +625,28 @@ public class SlaSettingsService implements SlaPolicyLookupService {
             String message = managing
                     ? "Sales Lead can only manage branch SLA settings"
                     : "Sales Lead must specify a branch to view SLA settings";
-            throw forbidden("branch_id", "BRANCH_SCOPE_REQUIRED", message);
+            throw BusinessException.forbidden("branch_id", "BRANCH_SCOPE_REQUIRED", message);
         }
         boolean assigned = userBranchRepository
                 .findByTenantIdAndUserIdAndStatus(actor.tenantId(), actor.actorId(), UserBranchStatus.ACTIVE)
                 .stream()
                 .anyMatch(userBranch -> branchId.equals(userBranch.branchId()));
         if (!assigned) {
-            throw forbidden("branch_id", "OUT_OF_SCOPE", "Branch is outside the actor scope");
+            throw BusinessException.forbidden("branch_id", "OUT_OF_SCOPE", "Branch is outside the actor scope");
         }
     }
 
-    private UUID requireTenantContext(CurrentUser actor) {
-        if (actor == null || actor.tenantId() == null) {
-            throw new BusinessException(ErrorCode.BUSINESS_RULE_VIOLATION, "Tenant context is required");
-        }
-        return actor.tenantId();
-    }
 
     private UUID requireId(UUID id, String field, String message) {
         if (id == null) {
-            throw validation(field, "REQUIRED", message);
+            throw ValidationException.of(field, "REQUIRED", message);
         }
         return id;
     }
 
     private Instant requireInstant(Instant instant, String field, String message) {
         if (instant == null) {
-            throw validation(field, "REQUIRED", message);
+            throw ValidationException.of(field, "REQUIRED", message);
         }
         return instant;
     }
@@ -708,28 +703,8 @@ public class SlaSettingsService implements SlaPolicyLookupService {
         ));
     }
 
-    private BusinessException notFound(String field, String message) {
-        return new BusinessException(
-                ErrorCode.RESOURCE_NOT_FOUND,
-                message,
-                List.of(ErrorDetail.of(field, "NOT_FOUND", message))
-        );
-    }
 
-    private BusinessException forbidden(String field, String code, String message) {
-        return new BusinessException(
-                ErrorCode.PERMISSION_DENIED,
-                message,
-                List.of(ErrorDetail.of(field, code, message))
-        );
-    }
 
-    private ValidationException validation(String field, String code, String message) {
-        return new ValidationException(
-                ErrorCode.VALIDATION_ERROR.defaultMessage(),
-                List.of(ErrorDetail.of(field, code, message))
-        );
-    }
 
     private record WorkingHoursSlot(
             UUID id,

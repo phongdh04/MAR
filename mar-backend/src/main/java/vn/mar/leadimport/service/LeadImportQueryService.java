@@ -13,6 +13,8 @@ import vn.mar.common.error.ErrorDetail;
 import vn.mar.common.exception.BusinessException;
 import vn.mar.common.exception.ValidationException;
 import vn.mar.common.pagination.PageResponse;
+import vn.mar.common.pagination.PageRequestFactory;
+import vn.mar.common.tenant.TenantContext;
 import vn.mar.leadimport.dto.request.ImportRowErrorSearchRequest;
 import vn.mar.leadimport.dto.request.LeadImportSearchRequest;
 import vn.mar.leadimport.dto.response.ImportBatchDetailResponse;
@@ -32,9 +34,6 @@ import vn.mar.security.context.CurrentUserContext;
 @Service
 public class LeadImportQueryService {
 
-    private static final int DEFAULT_PAGE = 0;
-    private static final int DEFAULT_SIZE = 20;
-    private static final int MAX_SIZE = 100;
 
     private final ImportBatchRepository importBatchRepository;
     private final ImportRowRepository importRowRepository;
@@ -54,8 +53,8 @@ public class LeadImportQueryService {
 
     @Transactional(readOnly = true)
     public PageResponse<ImportBatchSummaryResponse> searchLeadImports(LeadImportSearchRequest request) {
-        UUID tenantId = requireTenantContext(currentUserContext.currentUser());
-        PageRequest pageable = PageRequest.of(resolvePage(request.page()), resolveSize(request.size()));
+        UUID tenantId = TenantContext.requireTenantId(currentUserContext.currentUser());
+        PageRequest pageable = PageRequestFactory.of(request.page(), request.size());
         Page<ImportBatchSummaryResponse> responsePage = importBatchRepository.search(
                         tenantId,
                         ImportType.LEAD,
@@ -76,7 +75,7 @@ public class LeadImportQueryService {
     @Transactional(readOnly = true)
     public PageResponse<ImportRowErrorResponse> getLeadImportErrors(UUID batchId, ImportRowErrorSearchRequest request) {
         ImportBatch batch = findLeadBatchInCurrentTenant(batchId);
-        PageRequest pageable = PageRequest.of(resolvePage(request.page()), resolveSize(request.size()));
+        PageRequest pageable = PageRequestFactory.of(request.page(), request.size());
         Page<ImportRowErrorResponse> responsePage = importRowRepository
                 .findByTenantIdAndImportBatchIdAndRowStatusOrderByRowNumberAsc(
                         batch.tenantId(),
@@ -89,7 +88,7 @@ public class LeadImportQueryService {
     }
 
     private ImportBatch findLeadBatchInCurrentTenant(UUID batchId) {
-        UUID tenantId = requireTenantContext(currentUserContext.currentUser());
+        UUID tenantId = TenantContext.requireTenantId(currentUserContext.currentUser());
         return importBatchRepository.findByIdAndTenantIdAndImportType(batchId, tenantId, ImportType.LEAD)
                 .orElseThrow(() -> new BusinessException(ErrorCode.IMPORT_BATCH_NOT_FOUND, ErrorCode.IMPORT_BATCH_NOT_FOUND.defaultMessage()));
     }
@@ -99,12 +98,12 @@ public class LeadImportQueryService {
             return null;
         }
         if (!StringUtils.hasText(requestedStatus)) {
-            throw validation("status", "INVALID_STATUS", "Import batch status is invalid");
+            throw ValidationException.of("status", "INVALID_STATUS", "Import batch status is invalid");
         }
         try {
             return ImportBatchStatus.valueOf(requestedStatus.trim().toUpperCase(Locale.ROOT));
         } catch (IllegalArgumentException exception) {
-            throw validation("status", "INVALID_STATUS", "Import batch status is invalid");
+            throw ValidationException.of("status", "INVALID_STATUS", "Import batch status is invalid");
         }
     }
 
@@ -113,46 +112,15 @@ public class LeadImportQueryService {
             return null;
         }
         if (!StringUtils.hasText(requestedSourceType)) {
-            throw validation("source_type", "INVALID_SOURCE_TYPE", "Import source type is invalid");
+            throw ValidationException.of("source_type", "INVALID_SOURCE_TYPE", "Import source type is invalid");
         }
         try {
             return ImportSourceType.valueOf(requestedSourceType.trim().toUpperCase(Locale.ROOT));
         } catch (IllegalArgumentException exception) {
-            throw validation("source_type", "INVALID_SOURCE_TYPE", "Import source type is invalid");
+            throw ValidationException.of("source_type", "INVALID_SOURCE_TYPE", "Import source type is invalid");
         }
     }
 
-    private int resolvePage(Integer requestedPage) {
-        if (requestedPage == null) {
-            return DEFAULT_PAGE;
-        }
-        if (requestedPage < 0) {
-            throw validation("page", "MIN_VALUE", "Page must be greater than or equal to 0");
-        }
-        return requestedPage;
-    }
 
-    private int resolveSize(Integer requestedSize) {
-        if (requestedSize == null) {
-            return DEFAULT_SIZE;
-        }
-        if (requestedSize < 1 || requestedSize > MAX_SIZE) {
-            throw validation("size", "INVALID_SIZE", "Size must be between 1 and 100");
-        }
-        return requestedSize;
-    }
 
-    private UUID requireTenantContext(CurrentUser actor) {
-        if (actor.tenantId() == null) {
-            throw new BusinessException(ErrorCode.BUSINESS_RULE_VIOLATION, "Tenant context is required");
-        }
-        return actor.tenantId();
-    }
-
-    private ValidationException validation(String field, String code, String message) {
-        return new ValidationException(
-                ErrorCode.VALIDATION_ERROR.defaultMessage(),
-                List.of(ErrorDetail.of(field, code, message))
-        );
-    }
 }

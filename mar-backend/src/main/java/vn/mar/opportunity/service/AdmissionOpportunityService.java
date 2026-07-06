@@ -38,6 +38,8 @@ import vn.mar.common.exception.BusinessException;
 import vn.mar.common.exception.ValidationException;
 import vn.mar.common.logging.LogContext;
 import vn.mar.common.pagination.PageResponse;
+import vn.mar.common.pagination.PageRequestFactory;
+import vn.mar.common.tenant.TenantContext;
 import vn.mar.common.time.TimeProvider;
 import vn.mar.customer.entity.CustomerProfile;
 import vn.mar.customer.repository.CustomerProfileRepository;
@@ -87,9 +89,6 @@ import vn.mar.user.repository.UserRepository;
 @Service
 public class AdmissionOpportunityService implements AdmissionOpportunityManagementService, OpportunityAssignmentService {
 
-    private static final int DEFAULT_PAGE = 0;
-    private static final int DEFAULT_SIZE = 20;
-    private static final int MAX_SIZE = 100;
     private static final Set<OpportunityStage> ACTIVE_DUPLICATE_STAGES = EnumSet.of(
             OpportunityStage.NEW,
             OpportunityStage.CONTACTING,
@@ -231,14 +230,14 @@ public class AdmissionOpportunityService implements AdmissionOpportunityManageme
     @Transactional(readOnly = true)
     public PageResponse<AdmissionOpportunitySnapshot> searchOpportunities(AdmissionOpportunitySearchCommand command) {
         if (command == null) {
-            throw validation("command", "REQUIRED", "Opportunity search command is required");
+            throw ValidationException.of("command", "REQUIRED", "Opportunity search command is required");
         }
         CurrentUser actor = currentUserContext.currentUser();
         assertAnyPermission(actor, List.of(PermissionCodes.LEAD_VIEW, PermissionCodes.OPPORTUNITY_UPDATE), "OPPORTUNITY_VIEW_DENIED", "Permission is required to view opportunities");
-        UUID tenantId = requireTenantContext(actor);
+        UUID tenantId = TenantContext.requireTenantId(actor);
         UUID ownerId = resolveSearchOwner(actor, command.ownerId());
         OpportunityStage stage = resolveStage(command.stage());
-        PageRequest pageable = PageRequest.of(resolvePage(command.page()), resolveSize(command.size()), newestFirstSort());
+        PageRequest pageable = PageRequestFactory.of(command.page(), command.size(), newestFirstSort());
         Page<AdmissionOpportunitySnapshot> responsePage = admissionOpportunityRepository.search(
                         tenantId,
                         ownerId,
@@ -256,7 +255,7 @@ public class AdmissionOpportunityService implements AdmissionOpportunityManageme
     public AdmissionOpportunitySnapshot getOpportunity(UUID opportunityId) {
         CurrentUser actor = currentUserContext.currentUser();
         assertAnyPermission(actor, List.of(PermissionCodes.LEAD_VIEW, PermissionCodes.OPPORTUNITY_UPDATE), "OPPORTUNITY_VIEW_DENIED", "Permission is required to view opportunities");
-        AdmissionOpportunity opportunity = findOpportunity(requireTenantContext(actor), opportunityId);
+        AdmissionOpportunity opportunity = findOpportunity(TenantContext.requireTenantId(actor), opportunityId);
         assertOpportunityVisibleToActor(actor, opportunity);
         return admissionOpportunityMapper.toSnapshot(opportunity);
     }
@@ -266,7 +265,7 @@ public class AdmissionOpportunityService implements AdmissionOpportunityManageme
     public List<StageHistorySnapshot> getStageHistory(UUID opportunityId) {
         CurrentUser actor = currentUserContext.currentUser();
         assertAnyPermission(actor, List.of(PermissionCodes.LEAD_VIEW, PermissionCodes.OPPORTUNITY_UPDATE), "OPPORTUNITY_VIEW_DENIED", "Permission is required to view opportunity stage history");
-        UUID tenantId = requireTenantContext(actor);
+        UUID tenantId = TenantContext.requireTenantId(actor);
         AdmissionOpportunity opportunity = findOpportunity(tenantId, opportunityId);
         assertOpportunityVisibleToActor(actor, opportunity);
         return stageHistoryRepository
@@ -282,7 +281,7 @@ public class AdmissionOpportunityService implements AdmissionOpportunityManageme
         validateCreateActivityCommand(command);
         CurrentUser actor = currentUserContext.currentUser();
         assertPermission(actor, PermissionCodes.ACTIVITY_CREATE, "ACTIVITY_CREATE_DENIED", "Permission is required to create opportunity activities");
-        UUID tenantId = requireTenantContext(actor);
+        UUID tenantId = TenantContext.requireTenantId(actor);
         AdmissionOpportunity opportunity = findOpportunity(tenantId, command.opportunityId());
         assertOpportunityVisibleToActor(actor, opportunity);
 
@@ -325,18 +324,18 @@ public class AdmissionOpportunityService implements AdmissionOpportunityManageme
     @Transactional(readOnly = true)
     public PageResponse<OpportunityActivitySnapshot> searchActivities(OpportunityActivitySearchCommand command) {
         if (command == null) {
-            throw validation("command", "REQUIRED", "Opportunity activity search command is required");
+            throw ValidationException.of("command", "REQUIRED", "Opportunity activity search command is required");
         }
         CurrentUser actor = currentUserContext.currentUser();
         assertPermission(actor, PermissionCodes.ACTIVITY_VIEW, "ACTIVITY_VIEW_DENIED", "Permission is required to view opportunity activities");
-        UUID tenantId = requireTenantContext(actor);
+        UUID tenantId = TenantContext.requireTenantId(actor);
         AdmissionOpportunity opportunity = findOpportunity(tenantId, command.opportunityId());
         assertOpportunityVisibleToActor(actor, opportunity);
         Page<OpportunityActivitySnapshot> activities = activityRepository
                 .findByTenantIdAndOpportunityIdOrderByOccurredAtDescIdDesc(
                         tenantId,
                         opportunity.id(),
-                        PageRequest.of(resolvePage(command.page()), resolveSize(command.size()))
+                        PageRequestFactory.of(command.page(), command.size())
                 )
                 .map(admissionOpportunityMapper::toSnapshot);
         return PageResponse.from(activities);
@@ -348,7 +347,7 @@ public class AdmissionOpportunityService implements AdmissionOpportunityManageme
         validateUpdateCommand(command);
         CurrentUser actor = currentUserContext.currentUser();
         assertPermission(actor, PermissionCodes.OPPORTUNITY_UPDATE, "OPPORTUNITY_UPDATE_DENIED", "Permission is required to update opportunities");
-        UUID tenantId = requireTenantContext(actor);
+        UUID tenantId = TenantContext.requireTenantId(actor);
         AdmissionOpportunity opportunity = findOpportunity(tenantId, command.opportunityId());
         assertOpportunityVisibleToActor(actor, opportunity);
         Map<String, Object> beforeData = admissionOpportunityMapper.toAuditData(opportunity);
@@ -383,7 +382,7 @@ public class AdmissionOpportunityService implements AdmissionOpportunityManageme
         validateChangeStageCommand(command);
         CurrentUser actor = currentUserContext.currentUser();
         assertPermission(actor, PermissionCodes.OPPORTUNITY_UPDATE, "OPPORTUNITY_UPDATE_DENIED", "Permission is required to update opportunity stage");
-        UUID tenantId = requireTenantContext(actor);
+        UUID tenantId = TenantContext.requireTenantId(actor);
         AdmissionOpportunity opportunity = findOpportunity(tenantId, command.opportunityId());
         assertOpportunityVisibleToActor(actor, opportunity);
 
@@ -438,7 +437,7 @@ public class AdmissionOpportunityService implements AdmissionOpportunityManageme
         Instant now = timeProvider.now();
         AdmissionOpportunity opportunity = findOpportunity(command.tenantId(), command.opportunityId());
         User owner = userRepository.findByIdAndTenantId(command.ownerId(), command.tenantId())
-                .orElseThrow(() -> notFound("owner_id", "Owner user not found"));
+                .orElseThrow(() -> BusinessException.notFound("owner_id", "Owner user not found"));
         validateAssignableOwner(owner);
 
         Map<String, Object> beforeData = admissionOpportunityMapper.toAuditData(opportunity);
@@ -527,7 +526,7 @@ public class AdmissionOpportunityService implements AdmissionOpportunityManageme
 
     private void validateCreateCommand(CreateAdmissionOpportunityCommand command) {
         if (command == null) {
-            throw validation("command", "REQUIRED", "Opportunity creation command is required");
+            throw ValidationException.of("command", "REQUIRED", "Opportunity creation command is required");
         }
         requireId(command.tenantId(), "tenant_id", "Tenant id is required");
         requireId(command.customerId(), "customer_id", "Customer id is required");
@@ -536,40 +535,40 @@ public class AdmissionOpportunityService implements AdmissionOpportunityManageme
 
     private void validateUpdateCommand(UpdateAdmissionOpportunityCommand command) {
         if (command == null) {
-            throw validation("command", "REQUIRED", "Opportunity update command is required");
+            throw ValidationException.of("command", "REQUIRED", "Opportunity update command is required");
         }
         requireId(command.opportunityId(), "opportunity_id", "Opportunity id is required");
     }
 
     private void validateChangeStageCommand(ChangeOpportunityStageCommand command) {
         if (command == null) {
-            throw validation("command", "REQUIRED", "Opportunity stage change command is required");
+            throw ValidationException.of("command", "REQUIRED", "Opportunity stage change command is required");
         }
         requireId(command.opportunityId(), "opportunity_id", "Opportunity id is required");
         if (!StringUtils.hasText(command.toStage())) {
-            throw validation("to_stage", "REQUIRED", "Target stage is required");
+            throw ValidationException.of("to_stage", "REQUIRED", "Target stage is required");
         }
     }
 
     private void validateCreateActivityCommand(CreateOpportunityActivityCommand command) {
         if (command == null) {
-            throw validation("command", "REQUIRED", "Opportunity activity command is required");
+            throw ValidationException.of("command", "REQUIRED", "Opportunity activity command is required");
         }
         requireId(command.opportunityId(), "opportunity_id", "Opportunity id is required");
         if (!StringUtils.hasText(command.activityType())) {
-            throw validation("activity_type", "REQUIRED", "Activity type is required");
+            throw ValidationException.of("activity_type", "REQUIRED", "Activity type is required");
         }
         if (command.occurredAt() == null) {
-            throw validation("occurred_at", "REQUIRED", "Activity occurred time is required");
+            throw ValidationException.of("occurred_at", "REQUIRED", "Activity occurred time is required");
         }
         if (!StringUtils.hasText(command.source())) {
-            throw validation("source", "REQUIRED", "Activity source is required");
+            throw ValidationException.of("source", "REQUIRED", "Activity source is required");
         }
     }
 
     private void validateAssignOwnerCommand(AssignOpportunityOwnerCommand command) {
         if (command == null) {
-            throw validation("command", "REQUIRED", "Opportunity assignment command is required");
+            throw ValidationException.of("command", "REQUIRED", "Opportunity assignment command is required");
         }
         requireId(command.tenantId(), "tenant_id", "Tenant id is required");
         requireId(command.opportunityId(), "opportunity_id", "Opportunity id is required");
@@ -578,20 +577,20 @@ public class AdmissionOpportunityService implements AdmissionOpportunityManageme
 
     private Lead findLead(UUID tenantId, UUID leadId) {
         return leadRepository.findByIdAndTenantId(leadId, tenantId)
-                .orElseThrow(() -> notFound("source_lead_id", "Lead not found"));
+                .orElseThrow(() -> BusinessException.notFound("source_lead_id", "Lead not found"));
     }
 
     private CustomerProfile findCustomer(UUID tenantId, UUID customerId) {
         return customerProfileRepository.findByIdAndTenantId(customerId, tenantId)
-                .orElseThrow(() -> notFound("customer_id", "Customer profile not found"));
+                .orElseThrow(() -> BusinessException.notFound("customer_id", "Customer profile not found"));
     }
 
     private AdmissionOpportunity findOpportunity(UUID tenantId, UUID opportunityId) {
         if (opportunityId == null) {
-            throw validation("opportunity_id", "REQUIRED", "Opportunity id is required");
+            throw ValidationException.of("opportunity_id", "REQUIRED", "Opportunity id is required");
         }
         return admissionOpportunityRepository.findByIdAndTenantId(opportunityId, tenantId)
-                .orElseThrow(() -> notFound("opportunity_id", "Opportunity not found"));
+                .orElseThrow(() -> BusinessException.notFound("opportunity_id", "Opportunity not found"));
     }
 
     private void assertLeadCustomerCompatible(Lead lead, CustomerProfile customer) {
@@ -661,7 +660,7 @@ public class AdmissionOpportunityService implements AdmissionOpportunityManageme
                 throw inactiveParent("course_id", "Course is inactive");
             }
             if (resolvedProgramId != null && !resolvedProgramId.equals(course.programId())) {
-                throw validation("course_id", "PROGRAM_MISMATCH", "Course does not belong to selected program");
+                throw ValidationException.of("course_id", "PROGRAM_MISMATCH", "Course does not belong to selected program");
             }
             resolvedProgramId = course.programId();
         }
@@ -671,7 +670,7 @@ public class AdmissionOpportunityService implements AdmissionOpportunityManageme
                 throw inactiveParent("program_id", "Program is inactive");
             }
             if (resolvedLanguageId != null && !resolvedLanguageId.equals(program.languageId())) {
-                throw validation("program_id", "LANGUAGE_MISMATCH", "Program does not belong to selected language");
+                throw ValidationException.of("program_id", "LANGUAGE_MISMATCH", "Program does not belong to selected language");
             }
             resolvedLanguageId = program.languageId();
         }
@@ -686,17 +685,17 @@ public class AdmissionOpportunityService implements AdmissionOpportunityManageme
 
     private Language findLanguage(UUID tenantId, UUID languageId) {
         return languageRepository.findByIdAndTenantId(languageId, tenantId)
-                .orElseThrow(() -> notFound("language_id", "Language not found"));
+                .orElseThrow(() -> BusinessException.notFound("language_id", "Language not found"));
     }
 
     private Program findProgram(UUID tenantId, UUID programId) {
         return programRepository.findByIdAndTenantId(programId, tenantId)
-                .orElseThrow(() -> notFound("program_id", "Program not found"));
+                .orElseThrow(() -> BusinessException.notFound("program_id", "Program not found"));
     }
 
     private Course findCourse(UUID tenantId, UUID courseId) {
         return courseRepository.findByIdAndTenantId(courseId, tenantId)
-                .orElseThrow(() -> notFound("course_id", "Course not found"));
+                .orElseThrow(() -> BusinessException.notFound("course_id", "Course not found"));
     }
 
     private UUID resolveBranchId(UUID tenantId, UUID branchId, boolean requireActive) {
@@ -704,7 +703,7 @@ public class AdmissionOpportunityService implements AdmissionOpportunityManageme
             return null;
         }
         Branch branch = branchRepository.findByIdAndTenantId(branchId, tenantId)
-                .orElseThrow(() -> notFound("branch_id", "Branch not found"));
+                .orElseThrow(() -> BusinessException.notFound("branch_id", "Branch not found"));
         if (requireActive && branch.status() != BranchStatus.ACTIVE) {
             throw inactiveParent("branch_id", "Branch is inactive");
         }
@@ -716,7 +715,7 @@ public class AdmissionOpportunityService implements AdmissionOpportunityManageme
             return null;
         }
         User user = userRepository.findByIdAndTenantId(ownerId, tenantId)
-                .orElseThrow(() -> notFound("owner_id", "Owner user not found"));
+                .orElseThrow(() -> BusinessException.notFound("owner_id", "Owner user not found"));
         if (requireActive && user.status() != UserStatus.ACTIVE) {
             throw inactiveParent("owner_id", "Owner user is inactive");
         }
@@ -743,7 +742,7 @@ public class AdmissionOpportunityService implements AdmissionOpportunityManageme
         try {
             return OpportunityStage.valueOf(normalizeEnum(requestedStage));
         } catch (IllegalArgumentException exception) {
-            throw validation("stage", "INVALID_STAGE", "Opportunity stage is invalid");
+            throw ValidationException.of("stage", "INVALID_STAGE", "Opportunity stage is invalid");
         }
     }
 
@@ -751,7 +750,7 @@ public class AdmissionOpportunityService implements AdmissionOpportunityManageme
         try {
             return OpportunityStage.valueOf(normalizeEnum(requestedStage));
         } catch (IllegalArgumentException exception) {
-            throw validation("to_stage", "INVALID_STAGE", "Target stage is invalid");
+            throw ValidationException.of("to_stage", "INVALID_STAGE", "Target stage is invalid");
         }
     }
 
@@ -769,7 +768,7 @@ public class AdmissionOpportunityService implements AdmissionOpportunityManageme
         try {
             return LostReason.valueOf(normalizeEnum(requestedLostReason));
         } catch (IllegalArgumentException exception) {
-            throw validation("lost_reason", "INVALID_LOST_REASON", "Lost reason is invalid");
+            throw ValidationException.of("lost_reason", "INVALID_LOST_REASON", "Lost reason is invalid");
         }
     }
 
@@ -780,12 +779,12 @@ public class AdmissionOpportunityService implements AdmissionOpportunityManageme
             return currentStatus;
         }
         if (!StringUtils.hasText(requestedStatus)) {
-            throw validation("qualification_status", "INVALID_QUALIFICATION_STATUS", "Qualification status is invalid");
+            throw ValidationException.of("qualification_status", "INVALID_QUALIFICATION_STATUS", "Qualification status is invalid");
         }
         try {
             return QualificationStatus.valueOf(normalizeEnum(requestedStatus));
         } catch (IllegalArgumentException exception) {
-            throw validation("qualification_status", "INVALID_QUALIFICATION_STATUS", "Qualification status is invalid");
+            throw ValidationException.of("qualification_status", "INVALID_QUALIFICATION_STATUS", "Qualification status is invalid");
         }
     }
 
@@ -805,21 +804,21 @@ public class AdmissionOpportunityService implements AdmissionOpportunityManageme
         try {
             return ActivityType.valueOf(normalizeEnum(requestedType));
         } catch (IllegalArgumentException exception) {
-            throw validation("activity_type", "INVALID_ACTIVITY_TYPE", "Activity type is invalid");
+            throw ValidationException.of("activity_type", "INVALID_ACTIVITY_TYPE", "Activity type is invalid");
         }
     }
 
     private ActivityResult resolveActivityResult(ActivityType activityType, String requestedResult) {
         if (!StringUtils.hasText(requestedResult)) {
             if (activityType.requiresResult()) {
-                throw validation("activity_result", "REQUIRED", "Activity result is required for outbound activity");
+                throw ValidationException.of("activity_result", "REQUIRED", "Activity result is required for outbound activity");
             }
             return null;
         }
         try {
             return ActivityResult.valueOf(normalizeEnum(requestedResult));
         } catch (IllegalArgumentException exception) {
-            throw validation("activity_result", "INVALID_ACTIVITY_RESULT", "Activity result is invalid");
+            throw ValidationException.of("activity_result", "INVALID_ACTIVITY_RESULT", "Activity result is invalid");
         }
     }
 
@@ -827,20 +826,20 @@ public class AdmissionOpportunityService implements AdmissionOpportunityManageme
         try {
             return ActivitySource.valueOf(normalizeEnum(requestedSource));
         } catch (IllegalArgumentException exception) {
-            throw validation("source", "INVALID_ACTIVITY_SOURCE", "Activity source is invalid");
+            throw ValidationException.of("source", "INVALID_ACTIVITY_SOURCE", "Activity source is invalid");
         }
     }
 
     private void validateActivityTiming(Instant occurredAt, Instant nextActionAt) {
         if (nextActionAt != null && nextActionAt.isBefore(occurredAt)) {
-            throw validation("next_action_at", "BEFORE_OCCURRED_AT", "Next action time must be after occurred time");
+            throw ValidationException.of("next_action_at", "BEFORE_OCCURRED_AT", "Next action time must be after occurred time");
         }
     }
 
     private UUID resolveSearchOwner(CurrentUser actor, UUID requestedOwnerId) {
         if (isAdvisor(actor)) {
             if (requestedOwnerId != null && !requestedOwnerId.equals(actor.actorId())) {
-                throw forbidden("owner_id", "OWN_SCOPE_REQUIRED", "Advisor can only view own opportunities");
+                throw BusinessException.forbidden("owner_id", "OWN_SCOPE_REQUIRED", "Advisor can only view own opportunities");
             }
             return actor.actorId();
         }
@@ -853,7 +852,7 @@ public class AdmissionOpportunityService implements AdmissionOpportunityManageme
             throw invalidStageTransition(fromStage, toStage);
         }
         if (fromStage == OpportunityStage.LOST && !LOST_REOPEN_ROLES.contains(actor.roleCode())) {
-            throw forbidden("stage", "REOPEN_SCOPE_REQUIRED", "Only Sales Lead or Admin can reopen lost opportunities");
+            throw BusinessException.forbidden("stage", "REOPEN_SCOPE_REQUIRED", "Only Sales Lead or Admin can reopen lost opportunities");
         }
     }
 
@@ -889,7 +888,7 @@ public class AdmissionOpportunityService implements AdmissionOpportunityManageme
 
     private void assertOpportunityVisibleToActor(CurrentUser actor, AdmissionOpportunity opportunity) {
         if (isAdvisor(actor) && !actor.actorId().equals(opportunity.ownerId())) {
-            throw forbidden("opportunity_id", "OWN_SCOPE_REQUIRED", "Advisor can only access own opportunities");
+            throw BusinessException.forbidden("opportunity_id", "OWN_SCOPE_REQUIRED", "Advisor can only access own opportunities");
         }
     }
 
@@ -909,42 +908,17 @@ public class AdmissionOpportunityService implements AdmissionOpportunityManageme
 
     private void assertPermission(CurrentUser actor, String permissionCode, String detailCode, String message) {
         if (actor == null || !actor.hasPermission(permissionCode)) {
-            throw forbidden("permission", detailCode, message);
+            throw BusinessException.forbidden("permission", detailCode, message);
         }
     }
 
     private void assertAnyPermission(CurrentUser actor, List<String> permissionCodes, String detailCode, String message) {
         if (actor == null || permissionCodes.stream().noneMatch(actor::hasPermission)) {
-            throw forbidden("permission", detailCode, message);
+            throw BusinessException.forbidden("permission", detailCode, message);
         }
     }
 
-    private UUID requireTenantContext(CurrentUser actor) {
-        if (actor == null || actor.tenantId() == null) {
-            throw new BusinessException(ErrorCode.BUSINESS_RULE_VIOLATION, "Tenant context is required");
-        }
-        return actor.tenantId();
-    }
 
-    private int resolvePage(Integer requestedPage) {
-        if (requestedPage == null) {
-            return DEFAULT_PAGE;
-        }
-        if (requestedPage < 0) {
-            throw validation("page", "MIN_VALUE", "Page must be greater than or equal to 0");
-        }
-        return requestedPage;
-    }
-
-    private int resolveSize(Integer requestedSize) {
-        if (requestedSize == null) {
-            return DEFAULT_SIZE;
-        }
-        if (requestedSize < 1 || requestedSize > MAX_SIZE) {
-            throw validation("size", "INVALID_SIZE", "Size must be between 1 and 100");
-        }
-        return requestedSize;
-    }
 
     private Sort newestFirstSort() {
         return Sort.by(Sort.Direction.DESC, "createdAt");
@@ -963,7 +937,7 @@ public class AdmissionOpportunityService implements AdmissionOpportunityManageme
 
     private UUID requireId(UUID id, String field, String message) {
         if (id == null) {
-            throw validation(field, "REQUIRED", message);
+            throw ValidationException.of(field, "REQUIRED", message);
         }
         return id;
     }
@@ -976,21 +950,7 @@ public class AdmissionOpportunityService implements AdmissionOpportunityManageme
         );
     }
 
-    private BusinessException notFound(String field, String message) {
-        return new BusinessException(
-                ErrorCode.RESOURCE_NOT_FOUND,
-                message,
-                List.of(ErrorDetail.of(field, "NOT_FOUND", message))
-        );
-    }
 
-    private BusinessException forbidden(String field, String code, String message) {
-        return new BusinessException(
-                ErrorCode.PERMISSION_DENIED,
-                message,
-                List.of(ErrorDetail.of(field, code, message))
-        );
-    }
 
     private BusinessException invalidStageTransition(OpportunityStage fromStage, OpportunityStage toStage) {
         return new BusinessException(
@@ -1003,12 +963,6 @@ public class AdmissionOpportunityService implements AdmissionOpportunityManageme
         );
     }
 
-    private ValidationException validation(String field, String code, String message) {
-        return new ValidationException(
-                ErrorCode.VALIDATION_ERROR.defaultMessage(),
-                List.of(ErrorDetail.of(field, code, message))
-        );
-    }
 
     private CurrentUser currentUserOrSystem() {
         try {

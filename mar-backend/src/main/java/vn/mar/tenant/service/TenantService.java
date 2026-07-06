@@ -134,7 +134,7 @@ public class TenantService {
 
     private String requireTenantName(String tenantName) {
         if (!StringUtils.hasText(tenantName)) {
-            throw validation("tenant_name", "REQUIRED", "Tenant name is required");
+            throw ValidationException.of("tenant_name", "REQUIRED", "Tenant name is required");
         }
         return tenantName.trim();
     }
@@ -151,14 +151,14 @@ public class TenantService {
             return fallbackTimezone;
         }
         if (!StringUtils.hasText(requestedTimezone)) {
-            throw validation("timezone", "INVALID_TIMEZONE", "Timezone is invalid");
+            throw ValidationException.of("timezone", "INVALID_TIMEZONE", "Timezone is invalid");
         }
         String timezone = requestedTimezone.trim();
         try {
             ZoneId.of(timezone);
             return timezone;
         } catch (DateTimeException exception) {
-            throw validation("timezone", "INVALID_TIMEZONE", "Timezone is invalid");
+            throw ValidationException.of("timezone", "INVALID_TIMEZONE", "Timezone is invalid");
         }
     }
 
@@ -167,14 +167,14 @@ public class TenantService {
             return fallbackCurrency;
         }
         if (!StringUtils.hasText(requestedCurrency)) {
-            throw validation("default_currency", "INVALID_CURRENCY", "Default currency is invalid");
+            throw ValidationException.of("default_currency", "INVALID_CURRENCY", "Default currency is invalid");
         }
         String currency = requestedCurrency.trim().toUpperCase(Locale.ROOT);
         try {
             Currency.getInstance(currency);
             return currency;
         } catch (IllegalArgumentException exception) {
-            throw validation("default_currency", "INVALID_CURRENCY", "Default currency is invalid");
+            throw ValidationException.of("default_currency", "INVALID_CURRENCY", "Default currency is invalid");
         }
     }
 
@@ -183,12 +183,12 @@ public class TenantService {
             return fallbackStatus;
         }
         if (!StringUtils.hasText(requestedStatus)) {
-            throw validation("status", "INVALID_STATUS", "Tenant status is invalid");
+            throw ValidationException.of("status", "INVALID_STATUS", "Tenant status is invalid");
         }
         try {
             return TenantStatus.valueOf(requestedStatus.trim().toUpperCase(Locale.ROOT));
         } catch (IllegalArgumentException exception) {
-            throw validation("status", "INVALID_STATUS", "Tenant status is invalid");
+            throw ValidationException.of("status", "INVALID_STATUS", "Tenant status is invalid");
         }
     }
 
@@ -214,7 +214,7 @@ public class TenantService {
                 .replaceAll("[^A-Z0-9]+", "_")
                 .replaceAll("^_+|_+$", "");
         if (!StringUtils.hasText(code)) {
-            throw validation(fieldName, "INVALID_FORMAT", "Tenant code is invalid");
+            throw ValidationException.of(fieldName, "INVALID_FORMAT", "Tenant code is invalid");
         }
         if (code.length() > TENANT_CODE_MAX_LENGTH) {
             return code.substring(0, TENANT_CODE_MAX_LENGTH);
@@ -267,10 +267,4 @@ public class TenantService {
         return reason.trim();
     }
 
-    private ValidationException validation(String field, String code, String message) {
-        return new ValidationException(
-                ErrorCode.VALIDATION_ERROR.defaultMessage(),
-                List.of(ErrorDetail.of(field, code, message))
-        );
-    }
 }

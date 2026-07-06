@@ -46,6 +46,9 @@ import vn.mar.common.exception.ResourceNotFoundException;
 import vn.mar.common.exception.ValidationException;
 import vn.mar.common.logging.LogContext;
 import vn.mar.common.pagination.PageResponse;
+import vn.mar.common.pagination.PageRequestFactory;
+import vn.mar.common.search.SearchText;
+import vn.mar.common.tenant.TenantContext;
 import vn.mar.common.time.TimeProvider;
 import vn.mar.security.context.CurrentUser;
 import vn.mar.security.context.CurrentUserContext;
@@ -55,9 +58,6 @@ public class CatalogService {
 
     private static final int CODE_MAX_LENGTH = 50;
     private static final int CODE_SUFFIX_LENGTH = 8;
-    private static final int DEFAULT_PAGE = 0;
-    private static final int DEFAULT_SIZE = 20;
-    private static final int MAX_SIZE = 100;
     private static final String DEFAULT_CURRENCY = "VND";
 
     private final LanguageRepository languageRepository;
@@ -88,7 +88,7 @@ public class CatalogService {
     @Transactional
     public LanguageDetailResponse createLanguage(CreateLanguageRequest request) {
         CurrentUser actor = currentUserContext.currentUser();
-        UUID tenantId = requireTenantContext(actor);
+        UUID tenantId = TenantContext.requireTenantId(actor);
         Instant now = timeProvider.now();
         UUID languageId = UUID.randomUUID();
         String name = requireText(request.name(), "name", "Language name is required");
@@ -121,12 +121,12 @@ public class CatalogService {
 
     @Transactional(readOnly = true)
     public PageResponse<LanguageDetailResponse> searchLanguages(LanguageSearchRequest request) {
-        UUID tenantId = requireTenantContext(currentUserContext.currentUser());
-        PageRequest pageable = PageRequest.of(resolvePage(request.page()), resolveSize(request.size()), newestFirstSort());
+        UUID tenantId = TenantContext.requireTenantId(currentUserContext.currentUser());
+        PageRequest pageable = PageRequestFactory.of(request.page(), request.size(), newestFirstSort());
         Page<LanguageDetailResponse> responsePage = languageRepository.search(
                         tenantId,
                         resolveStatus(request.status(), null),
-                        normalizeKeyword(request.keyword()),
+                        SearchText.keyword(request.keyword()),
                         pageable
                 )
                 .map(catalogMapper::toDetailResponse);
@@ -136,7 +136,7 @@ public class CatalogService {
     @Transactional
     public LanguageDetailResponse updateLanguage(UUID languageId, UpdateLanguageRequest request) {
         CurrentUser actor = currentUserContext.currentUser();
-        UUID tenantId = requireTenantContext(actor);
+        UUID tenantId = TenantContext.requireTenantId(actor);
         Language language = findLanguage(tenantId, languageId);
         Map<String, Object> beforeData = catalogMapper.toAuditData(language);
         CatalogStatus previousStatus = language.status();
@@ -169,7 +169,7 @@ public class CatalogService {
     @Transactional
     public ProgramDetailResponse createProgram(CreateProgramRequest request) {
         CurrentUser actor = currentUserContext.currentUser();
-        UUID tenantId = requireTenantContext(actor);
+        UUID tenantId = TenantContext.requireTenantId(actor);
         Instant now = timeProvider.now();
         UUID programId = UUID.randomUUID();
         UUID languageId = requireId(request.languageId(), "language_id", "Language is required");
@@ -215,13 +215,13 @@ public class CatalogService {
 
     @Transactional(readOnly = true)
     public PageResponse<ProgramDetailResponse> searchPrograms(ProgramSearchRequest request) {
-        UUID tenantId = requireTenantContext(currentUserContext.currentUser());
-        PageRequest pageable = PageRequest.of(resolvePage(request.page()), resolveSize(request.size()), newestFirstSort());
+        UUID tenantId = TenantContext.requireTenantId(currentUserContext.currentUser());
+        PageRequest pageable = PageRequestFactory.of(request.page(), request.size(), newestFirstSort());
         Page<ProgramDetailResponse> responsePage = programRepository.search(
                         tenantId,
                         request.languageId(),
                         resolveStatus(request.status(), null),
-                        normalizeKeyword(request.keyword()),
+                        SearchText.keyword(request.keyword()),
                         pageable
                 )
                 .map(catalogMapper::toDetailResponse);
@@ -231,7 +231,7 @@ public class CatalogService {
     @Transactional
     public ProgramDetailResponse updateProgram(UUID programId, UpdateProgramRequest request) {
         CurrentUser actor = currentUserContext.currentUser();
-        UUID tenantId = requireTenantContext(actor);
+        UUID tenantId = TenantContext.requireTenantId(actor);
         Program program = findProgram(tenantId, programId);
         Map<String, Object> beforeData = catalogMapper.toAuditData(program);
         CatalogStatus previousStatus = program.status();
@@ -269,7 +269,7 @@ public class CatalogService {
     @Transactional
     public CourseDetailResponse createCourse(CreateCourseRequest request) {
         CurrentUser actor = currentUserContext.currentUser();
-        UUID tenantId = requireTenantContext(actor);
+        UUID tenantId = TenantContext.requireTenantId(actor);
         Instant now = timeProvider.now();
         UUID courseId = UUID.randomUUID();
         UUID programId = requireId(request.programId(), "program_id", "Program is required");
@@ -319,13 +319,13 @@ public class CatalogService {
 
     @Transactional(readOnly = true)
     public PageResponse<CourseDetailResponse> searchCourses(CourseSearchRequest request) {
-        UUID tenantId = requireTenantContext(currentUserContext.currentUser());
-        PageRequest pageable = PageRequest.of(resolvePage(request.page()), resolveSize(request.size()), newestFirstSort());
+        UUID tenantId = TenantContext.requireTenantId(currentUserContext.currentUser());
+        PageRequest pageable = PageRequestFactory.of(request.page(), request.size(), newestFirstSort());
         Page<CourseDetailResponse> responsePage = courseRepository.search(
                         tenantId,
                         request.programId(),
                         resolveStatus(request.status(), null),
-                        normalizeKeyword(request.keyword()),
+                        SearchText.keyword(request.keyword()),
                         pageable
                 )
                 .map(catalogMapper::toDetailResponse);
@@ -335,7 +335,7 @@ public class CatalogService {
     @Transactional
     public CourseDetailResponse updateCourse(UUID courseId, UpdateCourseRequest request) {
         CurrentUser actor = currentUserContext.currentUser();
-        UUID tenantId = requireTenantContext(actor);
+        UUID tenantId = TenantContext.requireTenantId(actor);
         Course course = findCourse(tenantId, courseId);
         Map<String, Object> beforeData = catalogMapper.toAuditData(course);
         CatalogStatus previousStatus = course.status();
@@ -373,15 +373,15 @@ public class CatalogService {
     }
 
     private Language findLanguageInCurrentTenant(UUID languageId) {
-        return findLanguage(requireTenantContext(currentUserContext.currentUser()), languageId);
+        return findLanguage(TenantContext.requireTenantId(currentUserContext.currentUser()), languageId);
     }
 
     private Program findProgramInCurrentTenant(UUID programId) {
-        return findProgram(requireTenantContext(currentUserContext.currentUser()), programId);
+        return findProgram(TenantContext.requireTenantId(currentUserContext.currentUser()), programId);
     }
 
     private Course findCourseInCurrentTenant(UUID courseId) {
-        return findCourse(requireTenantContext(currentUserContext.currentUser()), courseId);
+        return findCourse(TenantContext.requireTenantId(currentUserContext.currentUser()), courseId);
     }
 
     private Language findLanguage(UUID tenantId, UUID languageId) {
@@ -506,14 +506,14 @@ public class CatalogService {
 
     private UUID requireId(UUID id, String field, String message) {
         if (id == null) {
-            throw validation(field, "REQUIRED", message);
+            throw ValidationException.of(field, "REQUIRED", message);
         }
         return id;
     }
 
     private String requireText(String value, String field, String message) {
         if (!StringUtils.hasText(value)) {
-            throw validation(field, "REQUIRED", message);
+            throw ValidationException.of(field, "REQUIRED", message);
         }
         return value.trim();
     }
@@ -544,12 +544,12 @@ public class CatalogService {
             return fallbackStatus;
         }
         if (!StringUtils.hasText(requestedStatus)) {
-            throw validation("status", "INVALID_STATUS", "Catalog status is invalid");
+            throw ValidationException.of("status", "INVALID_STATUS", "Catalog status is invalid");
         }
         try {
             return CatalogStatus.valueOf(requestedStatus.trim().toUpperCase(Locale.ROOT));
         } catch (IllegalArgumentException exception) {
-            throw validation("status", "INVALID_STATUS", "Catalog status is invalid");
+            throw ValidationException.of("status", "INVALID_STATUS", "Catalog status is invalid");
         }
     }
 
@@ -582,7 +582,7 @@ public class CatalogService {
                 .replaceAll("[^A-Z0-9]+", "_")
                 .replaceAll("^_+|_+$", "");
         if (!StringUtils.hasText(code)) {
-            throw validation(field, "INVALID_FORMAT", "Catalog code is invalid");
+            throw ValidationException.of(field, "INVALID_FORMAT", "Catalog code is invalid");
         }
         if (code.length() > CODE_MAX_LENGTH) {
             return code.substring(0, CODE_MAX_LENGTH);
@@ -614,54 +614,21 @@ public class CatalogService {
 
     private String normalizeCurrency(String requestedCurrency) {
         if (!StringUtils.hasText(requestedCurrency)) {
-            throw validation("currency", "INVALID_CURRENCY", "Currency is invalid");
+            throw ValidationException.of("currency", "INVALID_CURRENCY", "Currency is invalid");
         }
         String currency = requestedCurrency.trim().toUpperCase(Locale.ROOT);
         try {
             Currency.getInstance(currency);
             return currency;
         } catch (IllegalArgumentException exception) {
-            throw validation("currency", "INVALID_CURRENCY", "Currency is invalid");
+            throw ValidationException.of("currency", "INVALID_CURRENCY", "Currency is invalid");
         }
-    }
-
-    private int resolvePage(Integer requestedPage) {
-        if (requestedPage == null) {
-            return DEFAULT_PAGE;
-        }
-        if (requestedPage < 0) {
-            throw validation("page", "MIN_VALUE", "Page must be greater than or equal to 0");
-        }
-        return requestedPage;
-    }
-
-    private int resolveSize(Integer requestedSize) {
-        if (requestedSize == null) {
-            return DEFAULT_SIZE;
-        }
-        if (requestedSize < 1 || requestedSize > MAX_SIZE) {
-            throw validation("size", "INVALID_SIZE", "Size must be between 1 and 100");
-        }
-        return requestedSize;
-    }
-
-    private String normalizeKeyword(String keyword) {
-        if (!StringUtils.hasText(keyword)) {
-            return null;
-        }
-        return keyword.trim().toLowerCase(Locale.ROOT);
     }
 
     private Sort newestFirstSort() {
         return Sort.by(Sort.Direction.DESC, "createdAt");
     }
 
-    private UUID requireTenantContext(CurrentUser actor) {
-        if (actor.tenantId() == null) {
-            throw new BusinessException(ErrorCode.BUSINESS_RULE_VIOLATION, "Tenant context is required");
-        }
-        return actor.tenantId();
-    }
 
     private void auditCatalogChange(
             String action,
@@ -698,10 +665,4 @@ public class CatalogService {
         return metadata;
     }
 
-    private ValidationException validation(String field, String code, String message) {
-        return new ValidationException(
-                ErrorCode.VALIDATION_ERROR.defaultMessage(),
-                List.of(ErrorDetail.of(field, code, message))
-        );
-    }
 }

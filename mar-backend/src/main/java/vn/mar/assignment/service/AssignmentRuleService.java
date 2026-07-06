@@ -52,6 +52,8 @@ import vn.mar.common.exception.BusinessException;
 import vn.mar.common.exception.ValidationException;
 import vn.mar.common.logging.LogContext;
 import vn.mar.common.pagination.PageResponse;
+import vn.mar.common.pagination.PageRequestFactory;
+import vn.mar.common.tenant.TenantContext;
 import vn.mar.common.time.TimeProvider;
 import vn.mar.security.context.CurrentUser;
 import vn.mar.security.context.CurrentUserContext;
@@ -65,9 +67,6 @@ import vn.mar.userbranch.repository.UserBranchRepository;
 @Service
 public class AssignmentRuleService {
 
-    private static final int DEFAULT_PAGE = 0;
-    private static final int DEFAULT_SIZE = 20;
-    private static final int MAX_SIZE = 100;
     private static final String ROLE_ADVISOR = "ADVISOR";
     private static final String ROLE_SALES_LEAD = "SALES_LEAD";
 
@@ -115,16 +114,16 @@ public class AssignmentRuleService {
     public PageResponse<AssignmentRuleSnapshot> searchRules(AssignmentRuleSearchCommand command) {
         CurrentUser actor = currentUserContext.currentUser();
         assertAnyPermission(actor, List.of(PermissionCodes.ASSIGNMENT_VIEW, PermissionCodes.ASSIGNMENT_MANAGE), "ASSIGNMENT_VIEW_DENIED", "Permission is required to view assignment rules");
-        UUID tenantId = requireTenantContext(actor);
+        UUID tenantId = TenantContext.requireTenantId(actor);
         UUID branchId = command == null ? null : command.branchId();
         assertBranchScope(actor, branchId, false);
         if (branchId != null) {
             ensureBranchBelongsToTenant(tenantId, branchId);
         }
         AssignmentRuleStatus status = resolveStatus(command == null ? null : command.status(), false, null);
-        PageRequest pageable = PageRequest.of(
-                resolvePage(command == null ? null : command.page()),
-                resolveSize(command == null ? null : command.size()),
+        PageRequest pageable = PageRequestFactory.of(
+                command == null ? null : command.page(),
+                command == null ? null : command.size(),
                 Sort.by(Sort.Direction.ASC, "priority").and(Sort.by(Sort.Direction.DESC, "createdAt"))
         );
         Page<AssignmentRule> rules = assignmentRuleRepository.search(tenantId, status, branchId, pageable);
@@ -139,7 +138,7 @@ public class AssignmentRuleService {
     public AssignmentRuleSnapshot getRule(UUID assignmentRuleId) {
         CurrentUser actor = currentUserContext.currentUser();
         assertAnyPermission(actor, List.of(PermissionCodes.ASSIGNMENT_VIEW, PermissionCodes.ASSIGNMENT_MANAGE), "ASSIGNMENT_VIEW_DENIED", "Permission is required to view assignment rules");
-        UUID tenantId = requireTenantContext(actor);
+        UUID tenantId = TenantContext.requireTenantId(actor);
         AssignmentRule rule = findRule(tenantId, assignmentRuleId);
         assertBranchScope(actor, rule.branchId(), false);
         return assignmentMapper.toSnapshot(rule, activeAdvisorIds(tenantId, rule.id()));
@@ -149,7 +148,7 @@ public class AssignmentRuleService {
     public AssignmentRuleSnapshot createRule(CreateAssignmentRuleRequest request) {
         CurrentUser actor = currentUserContext.currentUser();
         assertPermission(actor, PermissionCodes.ASSIGNMENT_MANAGE, "ASSIGNMENT_MANAGE_DENIED", "Permission is required to manage assignment rules");
-        UUID tenantId = requireTenantContext(actor);
+        UUID tenantId = TenantContext.requireTenantId(actor);
         RuleDefinition definition = resolveCreateDefinition(tenantId, request);
         assertBranchScope(actor, definition.branchId(), true);
         assertPriorityAvailableForCreate(tenantId, definition.priority(), definition.status());
@@ -179,7 +178,7 @@ public class AssignmentRuleService {
     public AssignmentRuleSnapshot updateRule(UUID assignmentRuleId, UpdateAssignmentRuleRequest request) {
         CurrentUser actor = currentUserContext.currentUser();
         assertPermission(actor, PermissionCodes.ASSIGNMENT_MANAGE, "ASSIGNMENT_MANAGE_DENIED", "Permission is required to manage assignment rules");
-        UUID tenantId = requireTenantContext(actor);
+        UUID tenantId = TenantContext.requireTenantId(actor);
         AssignmentRule rule = findRule(tenantId, assignmentRuleId);
         assertBranchScope(actor, rule.branchId(), true);
 
@@ -211,16 +210,16 @@ public class AssignmentRuleService {
     public PageResponse<UnassignedAssignmentItemSnapshot> searchUnassignedItems(UnassignedAssignmentItemSearchCommand command) {
         CurrentUser actor = currentUserContext.currentUser();
         assertAnyPermission(actor, List.of(PermissionCodes.ASSIGNMENT_VIEW, PermissionCodes.ASSIGNMENT_MANAGE), "ASSIGNMENT_VIEW_DENIED", "Permission is required to view unassigned queue");
-        UUID tenantId = requireTenantContext(actor);
+        UUID tenantId = TenantContext.requireTenantId(actor);
         UUID branchId = command == null ? null : command.branchId();
         assertBranchScope(actor, branchId, false);
         if (branchId != null) {
             ensureBranchBelongsToTenant(tenantId, branchId);
         }
         UnassignedAssignmentItemStatus status = resolveUnassignedStatus(command == null ? null : command.status());
-        PageRequest pageable = PageRequest.of(
-                resolvePage(command == null ? null : command.page()),
-                resolveSize(command == null ? null : command.size()),
+        PageRequest pageable = PageRequestFactory.of(
+                command == null ? null : command.page(),
+                command == null ? null : command.size(),
                 Sort.by(Sort.Direction.DESC, "createdAt")
         );
         return PageResponse.from(unassignedAssignmentItemRepository
@@ -230,7 +229,7 @@ public class AssignmentRuleService {
 
     private RuleDefinition resolveCreateDefinition(UUID tenantId, CreateAssignmentRuleRequest request) {
         if (request == null) {
-            throw validation("request", "REQUIRED", "Assignment rule request is required");
+            throw ValidationException.of("request", "REQUIRED", "Assignment rule request is required");
         }
         AssignmentRuleStatus status = resolveStatus(request.status(), false, AssignmentRuleStatus.ACTIVE);
         return resolveDefinition(
@@ -248,7 +247,7 @@ public class AssignmentRuleService {
 
     private RuleDefinition resolveUpdateDefinition(UUID tenantId, UpdateAssignmentRuleRequest request) {
         if (request == null) {
-            throw validation("request", "REQUIRED", "Assignment rule request is required");
+            throw ValidationException.of("request", "REQUIRED", "Assignment rule request is required");
         }
         AssignmentRuleStatus status = resolveStatus(request.status(), true, null);
         return resolveDefinition(
@@ -297,19 +296,19 @@ public class AssignmentRuleService {
         UUID resolvedProgramId = programId;
         if (programId != null) {
             Program program = programRepository.findByIdAndTenantId(programId, tenantId)
-                    .orElseThrow(() -> notFound("program_id", "Program not found"));
+                    .orElseThrow(() -> BusinessException.notFound("program_id", "Program not found"));
             if (program.status() != CatalogStatus.ACTIVE) {
                 throw inactiveParent("program_id", "Program is inactive");
             }
             if (resolvedLanguageId != null && !resolvedLanguageId.equals(program.languageId())) {
-                throw validation("program_id", "LANGUAGE_MISMATCH", "Program does not belong to selected language");
+                throw ValidationException.of("program_id", "LANGUAGE_MISMATCH", "Program does not belong to selected language");
             }
             resolvedLanguageId = program.languageId();
             resolvedProgramId = program.id();
         }
         if (resolvedLanguageId != null) {
             Language language = languageRepository.findByIdAndTenantId(resolvedLanguageId, tenantId)
-                    .orElseThrow(() -> notFound("language_id", "Language not found"));
+                    .orElseThrow(() -> BusinessException.notFound("language_id", "Language not found"));
             if (language.status() != CatalogStatus.ACTIVE) {
                 throw inactiveParent("language_id", "Language is inactive");
             }
@@ -322,7 +321,7 @@ public class AssignmentRuleService {
             return null;
         }
         Branch branch = branchRepository.findByIdAndTenantId(branchId, tenantId)
-                .orElseThrow(() -> notFound("branch_id", "Branch not found"));
+                .orElseThrow(() -> BusinessException.notFound("branch_id", "Branch not found"));
         if (branch.status() != BranchStatus.ACTIVE) {
             throw inactiveParent("branch_id", "Branch is inactive");
         }
@@ -335,7 +334,7 @@ public class AssignmentRuleService {
             AssignmentRuleStatus status,
             Set<UUID> advisorIds) {
         if (status == AssignmentRuleStatus.ACTIVE && advisorIds.isEmpty()) {
-            throw validation("advisor_ids", "REQUIRED", "Active assignment rule requires at least one advisor");
+            throw ValidationException.of("advisor_ids", "REQUIRED", "Active assignment rule requires at least one advisor");
         }
         if (advisorIds.isEmpty()) {
             return;
@@ -431,10 +430,10 @@ public class AssignmentRuleService {
 
     private AssignmentRule findRule(UUID tenantId, UUID assignmentRuleId) {
         if (assignmentRuleId == null) {
-            throw validation("assignment_rule_id", "REQUIRED", "Assignment rule id is required");
+            throw ValidationException.of("assignment_rule_id", "REQUIRED", "Assignment rule id is required");
         }
         return assignmentRuleRepository.findByIdAndTenantId(assignmentRuleId, tenantId)
-                .orElseThrow(() -> notFound("assignment_rule_id", "Assignment rule not found"));
+                .orElseThrow(() -> BusinessException.notFound("assignment_rule_id", "Assignment rule not found"));
     }
 
     private void assertPriorityAvailableForCreate(UUID tenantId, int priority, AssignmentRuleStatus status) {
@@ -453,7 +452,7 @@ public class AssignmentRuleService {
 
     private void ensureBranchBelongsToTenant(UUID tenantId, UUID branchId) {
         branchRepository.findByIdAndTenantId(branchId, tenantId)
-                .orElseThrow(() -> notFound("branch_id", "Branch not found"));
+                .orElseThrow(() -> BusinessException.notFound("branch_id", "Branch not found"));
     }
 
     private void assertBranchScope(CurrentUser actor, UUID branchId, boolean managing) {
@@ -464,42 +463,42 @@ public class AssignmentRuleService {
             String message = managing
                     ? "Sales Lead can only manage branch assignment rules"
                     : "Sales Lead must specify a branch to view assignment data";
-            throw forbidden("branch_id", "BRANCH_SCOPE_REQUIRED", message);
+            throw BusinessException.forbidden("branch_id", "BRANCH_SCOPE_REQUIRED", message);
         }
         boolean assigned = userBranchRepository
                 .findByTenantIdAndUserIdAndStatus(actor.tenantId(), actor.actorId(), UserBranchStatus.ACTIVE)
                 .stream()
                 .anyMatch(userBranch -> branchId.equals(userBranch.branchId()));
         if (!assigned) {
-            throw forbidden("branch_id", "OUT_OF_SCOPE", "Branch is outside the actor scope");
+            throw BusinessException.forbidden("branch_id", "OUT_OF_SCOPE", "Branch is outside the actor scope");
         }
     }
 
     private String requireRuleName(String ruleName) {
         if (!StringUtils.hasText(ruleName)) {
-            throw validation("rule_name", "REQUIRED", "Rule name is required");
+            throw ValidationException.of("rule_name", "REQUIRED", "Rule name is required");
         }
         return ruleName.trim();
     }
 
     private int requirePriority(Integer priority) {
         if (priority == null) {
-            throw validation("priority", "REQUIRED", "Priority is required");
+            throw ValidationException.of("priority", "REQUIRED", "Priority is required");
         }
         if (priority < 0) {
-            throw validation("priority", "MIN_VALUE", "Priority must be greater than or equal to 0");
+            throw ValidationException.of("priority", "MIN_VALUE", "Priority must be greater than or equal to 0");
         }
         return priority;
     }
 
     private Set<UUID> normalizeAdvisorIds(Collection<UUID> advisorIds) {
         if (advisorIds == null) {
-            throw validation("advisor_ids", "REQUIRED", "Advisor ids are required");
+            throw ValidationException.of("advisor_ids", "REQUIRED", "Advisor ids are required");
         }
         Set<UUID> normalized = new LinkedHashSet<>();
         for (UUID advisorId : advisorIds) {
             if (advisorId == null) {
-                throw validation("advisor_ids", "INVALID", "Advisor id must not be null");
+                throw ValidationException.of("advisor_ids", "INVALID", "Advisor id must not be null");
             }
             normalized.add(advisorId);
         }
@@ -508,26 +507,26 @@ public class AssignmentRuleService {
 
     private AssignmentStrategy resolveStrategy(String value) {
         if (!StringUtils.hasText(value)) {
-            throw validation("assignment_strategy", "REQUIRED", "Assignment strategy is required");
+            throw ValidationException.of("assignment_strategy", "REQUIRED", "Assignment strategy is required");
         }
         try {
             return AssignmentStrategy.valueOf(value.trim().toUpperCase(Locale.ROOT));
         } catch (IllegalArgumentException exception) {
-            throw validation("assignment_strategy", "INVALID", "Assignment strategy is invalid");
+            throw ValidationException.of("assignment_strategy", "INVALID", "Assignment strategy is invalid");
         }
     }
 
     private AssignmentRuleStatus resolveStatus(String value, boolean required, AssignmentRuleStatus defaultStatus) {
         if (!StringUtils.hasText(value)) {
             if (required) {
-                throw validation("status", "REQUIRED", "Assignment rule status is required");
+                throw ValidationException.of("status", "REQUIRED", "Assignment rule status is required");
             }
             return defaultStatus;
         }
         try {
             return AssignmentRuleStatus.valueOf(value.trim().toUpperCase(Locale.ROOT));
         } catch (IllegalArgumentException exception) {
-            throw validation("status", "INVALID", "Assignment rule status is invalid");
+            throw ValidationException.of("status", "INVALID", "Assignment rule status is invalid");
         }
     }
 
@@ -538,48 +537,23 @@ public class AssignmentRuleService {
         try {
             return UnassignedAssignmentItemStatus.valueOf(value.trim().toUpperCase(Locale.ROOT));
         } catch (IllegalArgumentException exception) {
-            throw validation("status", "INVALID", "Unassigned item status is invalid");
+            throw ValidationException.of("status", "INVALID", "Unassigned item status is invalid");
         }
     }
 
     private void assertPermission(CurrentUser actor, String permissionCode, String detailCode, String message) {
         if (actor == null || !actor.hasPermission(permissionCode)) {
-            throw forbidden("permission", detailCode, message);
+            throw BusinessException.forbidden("permission", detailCode, message);
         }
     }
 
     private void assertAnyPermission(CurrentUser actor, List<String> permissionCodes, String detailCode, String message) {
         if (actor == null || permissionCodes.stream().noneMatch(actor::hasPermission)) {
-            throw forbidden("permission", detailCode, message);
+            throw BusinessException.forbidden("permission", detailCode, message);
         }
     }
 
-    private UUID requireTenantContext(CurrentUser actor) {
-        if (actor == null || actor.tenantId() == null) {
-            throw new BusinessException(ErrorCode.BUSINESS_RULE_VIOLATION, "Tenant context is required");
-        }
-        return actor.tenantId();
-    }
 
-    private int resolvePage(Integer requestedPage) {
-        if (requestedPage == null) {
-            return DEFAULT_PAGE;
-        }
-        if (requestedPage < 0) {
-            throw validation("page", "MIN_VALUE", "Page must be greater than or equal to 0");
-        }
-        return requestedPage;
-    }
-
-    private int resolveSize(Integer requestedSize) {
-        if (requestedSize == null) {
-            return DEFAULT_SIZE;
-        }
-        if (requestedSize < 1 || requestedSize > MAX_SIZE) {
-            throw validation("size", "INVALID_SIZE", "Size must be between 1 and 100");
-        }
-        return requestedSize;
-    }
 
     private String normalizeOptional(String value) {
         if (!StringUtils.hasText(value)) {
@@ -604,28 +578,8 @@ public class AssignmentRuleService {
         );
     }
 
-    private BusinessException notFound(String field, String message) {
-        return new BusinessException(
-                ErrorCode.RESOURCE_NOT_FOUND,
-                message,
-                List.of(ErrorDetail.of(field, "NOT_FOUND", message))
-        );
-    }
 
-    private BusinessException forbidden(String field, String code, String message) {
-        return new BusinessException(
-                ErrorCode.PERMISSION_DENIED,
-                message,
-                List.of(ErrorDetail.of(field, code, message))
-        );
-    }
 
-    private ValidationException validation(String field, String code, String message) {
-        return new ValidationException(
-                ErrorCode.VALIDATION_ERROR.defaultMessage(),
-                List.of(ErrorDetail.of(field, code, message))
-        );
-    }
 
     private void auditRuleChange(
             String action,

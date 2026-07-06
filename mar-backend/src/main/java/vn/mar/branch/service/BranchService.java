@@ -32,6 +32,9 @@ import vn.mar.common.exception.ResourceNotFoundException;
 import vn.mar.common.exception.ValidationException;
 import vn.mar.common.logging.LogContext;
 import vn.mar.common.pagination.PageResponse;
+import vn.mar.common.pagination.PageRequestFactory;
+import vn.mar.common.search.SearchText;
+import vn.mar.common.tenant.TenantContext;
 import vn.mar.common.time.TimeProvider;
 import vn.mar.security.context.CurrentUser;
 import vn.mar.security.context.CurrentUserContext;
@@ -41,9 +44,6 @@ public class BranchService {
 
     private static final int BRANCH_CODE_MAX_LENGTH = 50;
     private static final int BRANCH_CODE_SUFFIX_LENGTH = 8;
-    private static final int DEFAULT_PAGE = 0;
-    private static final int DEFAULT_SIZE = 20;
-    private static final int MAX_SIZE = 100;
 
     private final BranchRepository branchRepository;
     private final BranchMapper branchMapper;
@@ -67,7 +67,7 @@ public class BranchService {
     @Transactional
     public BranchDetailResponse createBranch(CreateBranchRequest request) {
         CurrentUser actor = currentUserContext.currentUser();
-        UUID tenantId = requireTenantContext(actor);
+        UUID tenantId = TenantContext.requireTenantId(actor);
         Instant now = timeProvider.now();
         UUID branchId = UUID.randomUUID();
         String branchName = requireBranchName(request.branchName());
@@ -102,12 +102,10 @@ public class BranchService {
 
     @Transactional(readOnly = true)
     public PageResponse<BranchDetailResponse> searchBranches(BranchSearchRequest request) {
-        UUID tenantId = requireTenantContext(currentUserContext.currentUser());
-        int page = resolvePage(request.page());
-        int size = resolveSize(request.size());
+        UUID tenantId = TenantContext.requireTenantId(currentUserContext.currentUser());
         BranchStatus status = resolveStatus(request.status(), null);
-        String keyword = normalizeKeyword(request.keyword());
-        PageRequest pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
+        String keyword = SearchText.keyword(request.keyword());
+        PageRequest pageable = PageRequestFactory.of(request.page(), request.size(), Sort.by(Sort.Direction.DESC, "createdAt"));
         Page<BranchDetailResponse> responsePage = branchRepository.search(tenantId, status, keyword, pageable)
                 .map(branchMapper::toDetailResponse);
         return PageResponse.from(responsePage);
@@ -116,7 +114,7 @@ public class BranchService {
     @Transactional
     public BranchDetailResponse updateBranch(UUID branchId, UpdateBranchRequest request) {
         CurrentUser actor = currentUserContext.currentUser();
-        UUID tenantId = requireTenantContext(actor);
+        UUID tenantId = TenantContext.requireTenantId(actor);
         Branch branch = findBranch(tenantId, branchId);
         Map<String, Object> beforeData = branchMapper.toAuditData(branch);
         BranchStatus previousStatus = branch.status();
@@ -151,7 +149,7 @@ public class BranchService {
     }
 
     private Branch findBranchInCurrentTenant(UUID branchId) {
-        return findBranch(requireTenantContext(currentUserContext.currentUser()), branchId);
+        return findBranch(TenantContext.requireTenantId(currentUserContext.currentUser()), branchId);
     }
 
     private Branch findBranch(UUID tenantId, UUID branchId) {
@@ -161,7 +159,7 @@ public class BranchService {
 
     private String requireBranchName(String branchName) {
         if (!StringUtils.hasText(branchName)) {
-            throw validation("branch_name", "REQUIRED", "Branch name is required");
+            throw ValidationException.of("branch_name", "REQUIRED", "Branch name is required");
         }
         return branchName.trim();
     }
@@ -192,12 +190,12 @@ public class BranchService {
             return fallbackStatus;
         }
         if (!StringUtils.hasText(requestedStatus)) {
-            throw validation("status", "INVALID_STATUS", "Branch status is invalid");
+            throw ValidationException.of("status", "INVALID_STATUS", "Branch status is invalid");
         }
         try {
             return BranchStatus.valueOf(requestedStatus.trim().toUpperCase(Locale.ROOT));
         } catch (IllegalArgumentException exception) {
-            throw validation("status", "INVALID_STATUS", "Branch status is invalid");
+            throw ValidationException.of("status", "INVALID_STATUS", "Branch status is invalid");
         }
     }
 
@@ -223,7 +221,7 @@ public class BranchService {
                 .replaceAll("[^A-Z0-9]+", "_")
                 .replaceAll("^_+|_+$", "");
         if (!StringUtils.hasText(code)) {
-            throw validation(fieldName, "INVALID_FORMAT", "Branch code is invalid");
+            throw ValidationException.of(fieldName, "INVALID_FORMAT", "Branch code is invalid");
         }
         if (code.length() > BRANCH_CODE_MAX_LENGTH) {
             return code.substring(0, BRANCH_CODE_MAX_LENGTH);
@@ -260,40 +258,6 @@ public class BranchService {
         }
     }
 
-    private int resolvePage(Integer requestedPage) {
-        if (requestedPage == null) {
-            return DEFAULT_PAGE;
-        }
-        if (requestedPage < 0) {
-            throw validation("page", "MIN_VALUE", "Page must be greater than or equal to 0");
-        }
-        return requestedPage;
-    }
-
-    private int resolveSize(Integer requestedSize) {
-        if (requestedSize == null) {
-            return DEFAULT_SIZE;
-        }
-        if (requestedSize < 1 || requestedSize > MAX_SIZE) {
-            throw validation("size", "INVALID_SIZE", "Size must be between 1 and 100");
-        }
-        return requestedSize;
-    }
-
-    private String normalizeKeyword(String keyword) {
-        if (!StringUtils.hasText(keyword)) {
-            return null;
-        }
-        return keyword.trim().toLowerCase(Locale.ROOT);
-    }
-
-    private UUID requireTenantContext(CurrentUser actor) {
-        if (actor.tenantId() == null) {
-            throw new BusinessException(ErrorCode.BUSINESS_RULE_VIOLATION, "Tenant context is required");
-        }
-        return actor.tenantId();
-    }
-
     private void auditBranchChange(
             String action,
             CurrentUser actor,
@@ -326,10 +290,4 @@ public class BranchService {
         return metadata;
     }
 
-    private ValidationException validation(String field, String code, String message) {
-        return new ValidationException(
-                ErrorCode.VALIDATION_ERROR.defaultMessage(),
-                List.of(ErrorDetail.of(field, code, message))
-        );
-    }
 }

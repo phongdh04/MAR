@@ -108,25 +108,25 @@ public class LeadImportFixtureService {
 
     private void validateCommand(LeadImportFixtureCommand command) {
         if (command == null) {
-            throw validation("fixture", "REQUIRED", "Import fixture command is required");
+            throw ValidationException.of("fixture", "REQUIRED", "Import fixture command is required");
         }
         if (command.tenantId() == null) {
-            throw validation("tenant_id", "REQUIRED", "Tenant is required");
+            throw ValidationException.of("tenant_id", "REQUIRED", "Tenant is required");
         }
         if (command.actorId() == null) {
-            throw validation("actor_id", "REQUIRED", "Actor is required");
+            throw ValidationException.of("actor_id", "REQUIRED", "Actor is required");
         }
         if (command.sourceType() == null) {
-            throw validation("source_type", "REQUIRED", "Source type is required");
+            throw ValidationException.of("source_type", "REQUIRED", "Source type is required");
         }
         if (command.status() == null) {
-            throw validation("status", "REQUIRED", "Import batch status is required");
+            throw ValidationException.of("status", "REQUIRED", "Import batch status is required");
         }
         if (!StringUtils.hasText(command.originalFileName())) {
-            throw validation("original_file_name", "REQUIRED", "Original file name is required");
+            throw ValidationException.of("original_file_name", "REQUIRED", "Original file name is required");
         }
         if (command.mappingConfig() == null || command.mappingConfig().isEmpty()) {
-            throw validation("mapping_config", "REQUIRED", "Mapping config is required");
+            throw ValidationException.of("mapping_config", "REQUIRED", "Mapping config is required");
         }
         validateCounts(command);
         validateRows(command);
@@ -134,16 +134,16 @@ public class LeadImportFixtureService {
 
     private void validateCounts(LeadImportFixtureCommand command) {
         if (command.totalRows() < 0) {
-            throw validation("total_rows", "MIN_VALUE", "Total rows must be greater than or equal to 0");
+            throw ValidationException.of("total_rows", "MIN_VALUE", "Total rows must be greater than or equal to 0");
         }
         if (command.validRows() < 0) {
-            throw validation("valid_count", "MIN_VALUE", "Valid count must be greater than or equal to 0");
+            throw ValidationException.of("valid_count", "MIN_VALUE", "Valid count must be greater than or equal to 0");
         }
         if (command.errorRows() < 0) {
-            throw validation("error_count", "MIN_VALUE", "Error count must be greater than or equal to 0");
+            throw ValidationException.of("error_count", "MIN_VALUE", "Error count must be greater than or equal to 0");
         }
         if (command.duplicateRows() < 0) {
-            throw validation("duplicate_count", "MIN_VALUE", "Duplicate count must be greater than or equal to 0");
+            throw ValidationException.of("duplicate_count", "MIN_VALUE", "Duplicate count must be greater than or equal to 0");
         }
         int summarizedRows = command.validRows() + command.errorRows() + command.duplicateRows();
         if (summarizedRows > command.totalRows()) {
@@ -153,17 +153,17 @@ public class LeadImportFixtureService {
 
     private void validateRows(LeadImportFixtureCommand command) {
         if (command.rows() == null || command.rows().isEmpty()) {
-            throw validation("rows", "REQUIRED", "Import fixture rows are required");
+            throw ValidationException.of("rows", "REQUIRED", "Import fixture rows are required");
         }
         for (LeadImportFixtureRowCommand row : command.rows()) {
             if (row.rowNumber() < 1) {
-                throw validation("row_number", "MIN_VALUE", "Row number must be greater than 0");
+                throw ValidationException.of("row_number", "MIN_VALUE", "Row number must be greater than 0");
             }
             if (row.rowStatus() == null) {
-                throw validation("row_status", "REQUIRED", "Row status is required");
+                throw ValidationException.of("row_status", "REQUIRED", "Row status is required");
             }
             if (row.rowStatus() == ImportRowStatus.ERROR && (row.errorDetails() == null || row.errorDetails().isEmpty())) {
-                throw validation("error_details", "REQUIRED", "Error rows must include error details");
+                throw ValidationException.of("error_details", "REQUIRED", "Error rows must include error details");
             }
         }
     }
@@ -234,10 +234,4 @@ public class LeadImportFixtureService {
         ));
     }
 
-    private ValidationException validation(String field, String code, String message) {
-        return new ValidationException(
-                ErrorCode.VALIDATION_ERROR.defaultMessage(),
-                List.of(ErrorDetail.of(field, code, message))
-        );
-    }
 }

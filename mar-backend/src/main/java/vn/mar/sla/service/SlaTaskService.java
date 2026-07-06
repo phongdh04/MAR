@@ -28,6 +28,8 @@ import vn.mar.common.exception.BusinessException;
 import vn.mar.common.exception.ValidationException;
 import vn.mar.common.logging.LogContext;
 import vn.mar.common.pagination.PageResponse;
+import vn.mar.common.pagination.PageRequestFactory;
+import vn.mar.common.tenant.TenantContext;
 import vn.mar.common.time.TimeProvider;
 import vn.mar.lead.model.LeadTemperature;
 import vn.mar.security.context.CurrentUser;
@@ -54,9 +56,6 @@ import vn.mar.userbranch.repository.UserBranchRepository;
 public class SlaTaskService implements SlaTaskManagementService {
 
     private static final Logger log = LoggerFactory.getLogger(SlaTaskService.class);
-    private static final int DEFAULT_PAGE = 0;
-    private static final int DEFAULT_SIZE = 20;
-    private static final int MAX_SIZE = 100;
     private static final Duration SALES_LEAD_ESCALATION_DELAY = Duration.ofMinutes(15);
     private static final List<SlaTaskStatus> ACTIVE_STATUSES = List.of(SlaTaskStatus.OPEN, SlaTaskStatus.OVERDUE);
     private static final String ROLE_ADVISOR = "ADVISOR";
@@ -200,11 +199,11 @@ public class SlaTaskService implements SlaTaskManagementService {
     @Transactional(readOnly = true)
     public PageResponse<SlaTaskSnapshot> searchTasks(SlaTaskSearchCommand command) {
         if (command == null) {
-            throw validation("command", "REQUIRED", "SLA task search command is required");
+            throw ValidationException.of("command", "REQUIRED", "SLA task search command is required");
         }
         CurrentUser actor = currentUserContext.currentUser();
         assertCanViewTasks(actor);
-        UUID tenantId = requireTenantContext(actor);
+        UUID tenantId = TenantContext.requireTenantId(actor);
         SlaTaskStatus status = parseStatus(command.status());
         SlaTaskType taskType = parseTaskType(command.taskType());
         UUID branchId = command.branchId();
@@ -212,12 +211,12 @@ public class SlaTaskService implements SlaTaskManagementService {
             ensureBranchBelongsToTenant(tenantId, branchId);
         }
         UUID ownerId = resolveSearchOwner(actor, command.ownerId());
-        PageRequest pageable = PageRequest.of(resolvePage(command.page()), resolveSize(command.size()), dueFirstSort());
+        PageRequest pageable = PageRequestFactory.of(command.page(), command.size(), dueFirstSort());
         Page<SlaTask> page;
         if (isSalesLead(actor)) {
             List<UUID> branchIds = resolveSalesLeadBranchScope(actor, branchId);
             if (branchIds.isEmpty()) {
-                return new PageResponse<>(List.of(), pageable.getPageNumber(), pageable.getPageSize(), 0L, 0);
+                return PageResponse.empty(pageable);
             }
             page = slaTaskRepository.searchBranchScoped(tenantId, branchIds, ownerId, status, taskType, pageable);
         } else {
@@ -231,7 +230,7 @@ public class SlaTaskService implements SlaTaskManagementService {
     public SlaOverdueScanSnapshot scanOverdueTasks() {
         CurrentUser actor = currentUserContext.currentUser();
         assertCanManageTasks(actor);
-        UUID tenantId = requireTenantContext(actor);
+        UUID tenantId = TenantContext.requireTenantId(actor);
         Instant now = timeProvider.now();
         List<UUID> branchIds = isSalesLead(actor) ? resolveSalesLeadBranchScope(actor, null) : null;
         int escalatedSalesLeadCount = escalateReadyAdvisorOverdueTasks(actor, tenantId, branchIds, now);
@@ -314,7 +313,7 @@ public class SlaTaskService implements SlaTaskManagementService {
 
     private void validateOpenCommand(OpenFirstResponseSlaTaskCommand command) {
         if (command == null) {
-            throw validation("command", "REQUIRED", "SLA task open command is required");
+            throw ValidationException.of("command", "REQUIRED", "SLA task open command is required");
         }
         requireId(command.tenantId(), "tenant_id", "Tenant id is required");
         requireId(command.opportunityId(), "opportunity_id", "Opportunity id is required");
@@ -325,7 +324,7 @@ public class SlaTaskService implements SlaTaskManagementService {
 
     private void validateCompleteCommand(CompleteFirstResponseSlaTaskCommand command) {
         if (command == null) {
-            throw validation("command", "REQUIRED", "SLA task complete command is required");
+            throw ValidationException.of("command", "REQUIRED", "SLA task complete command is required");
         }
         requireId(command.tenantId(), "tenant_id", "Tenant id is required");
         requireId(command.opportunityId(), "opportunity_id", "Opportunity id is required");
@@ -336,7 +335,7 @@ public class SlaTaskService implements SlaTaskManagementService {
     private UUID resolveSearchOwner(CurrentUser actor, UUID requestedOwnerId) {
         if (isAdvisor(actor)) {
             if (requestedOwnerId != null && !requestedOwnerId.equals(actor.actorId())) {
-                throw forbidden("owner_id", "OWN_SCOPE_REQUIRED", "Advisor can only view own SLA tasks");
+                throw BusinessException.forbidden("owner_id", "OWN_SCOPE_REQUIRED", "Advisor can only view own SLA tasks");
             }
             return actor.actorId();
         }
@@ -354,7 +353,7 @@ public class SlaTaskService implements SlaTaskManagementService {
             return branchIds;
         }
         if (!branchIds.contains(requestedBranchId)) {
-            throw forbidden("branch_id", "OUT_OF_SCOPE", "Branch is outside the actor scope");
+            throw BusinessException.forbidden("branch_id", "OUT_OF_SCOPE", "Branch is outside the actor scope");
         }
         return List.of(requestedBranchId);
     }
@@ -366,7 +365,7 @@ public class SlaTaskService implements SlaTaskManagementService {
         try {
             return SlaTaskStatus.valueOf(normalizeEnum(requestedStatus));
         } catch (IllegalArgumentException exception) {
-            throw validation("status", "INVALID_STATUS", "SLA task status is invalid");
+            throw ValidationException.of("status", "INVALID_STATUS", "SLA task status is invalid");
         }
     }
 
@@ -377,69 +376,44 @@ public class SlaTaskService implements SlaTaskManagementService {
         try {
             return SlaTaskType.valueOf(normalizeEnum(requestedTaskType));
         } catch (IllegalArgumentException exception) {
-            throw validation("task_type", "INVALID_TASK_TYPE", "SLA task type is invalid");
+            throw ValidationException.of("task_type", "INVALID_TASK_TYPE", "SLA task type is invalid");
         }
     }
 
     private void ensureBranchBelongsToTenant(UUID tenantId, UUID branchId) {
         branchRepository.findByIdAndTenantId(branchId, tenantId)
-                .orElseThrow(() -> notFound("branch_id", "Branch was not found"));
+                .orElseThrow(() -> BusinessException.notFound("branch_id", "Branch was not found"));
     }
 
     private void assertCanViewTasks(CurrentUser actor) {
         if (actor == null
                 || (!actor.hasPermission(PermissionCodes.SLA_TASK_VIEW)
                 && !actor.hasPermission(PermissionCodes.SLA_TASK_MANAGE))) {
-            throw forbidden("permission", "SLA_TASK_VIEW_DENIED", "Permission is required to view SLA tasks");
+            throw BusinessException.forbidden("permission", "SLA_TASK_VIEW_DENIED", "Permission is required to view SLA tasks");
         }
     }
 
     private void assertCanManageTasks(CurrentUser actor) {
         if (actor == null || !actor.hasPermission(PermissionCodes.SLA_TASK_MANAGE)) {
-            throw forbidden("permission", "SLA_TASK_MANAGE_DENIED", "Permission is required to manage SLA tasks");
+            throw BusinessException.forbidden("permission", "SLA_TASK_MANAGE_DENIED", "Permission is required to manage SLA tasks");
         }
     }
 
-    private UUID requireTenantContext(CurrentUser actor) {
-        if (actor == null || actor.tenantId() == null) {
-            throw new BusinessException(ErrorCode.BUSINESS_RULE_VIOLATION, "Tenant context is required");
-        }
-        return actor.tenantId();
-    }
 
     private UUID requireId(UUID id, String field, String message) {
         if (id == null) {
-            throw validation(field, "REQUIRED", message);
+            throw ValidationException.of(field, "REQUIRED", message);
         }
         return id;
     }
 
     private Instant requireInstant(Instant instant, String field, String message) {
         if (instant == null) {
-            throw validation(field, "REQUIRED", message);
+            throw ValidationException.of(field, "REQUIRED", message);
         }
         return instant;
     }
 
-    private int resolvePage(Integer requestedPage) {
-        if (requestedPage == null) {
-            return DEFAULT_PAGE;
-        }
-        if (requestedPage < 0) {
-            throw validation("page", "MIN_VALUE", "Page must be greater than or equal to 0");
-        }
-        return requestedPage;
-    }
-
-    private int resolveSize(Integer requestedSize) {
-        if (requestedSize == null) {
-            return DEFAULT_SIZE;
-        }
-        if (requestedSize < 1 || requestedSize > MAX_SIZE) {
-            throw validation("size", "INVALID_SIZE", "Size must be between 1 and 100");
-        }
-        return requestedSize;
-    }
 
     private Sort dueFirstSort() {
         return Sort.by(Sort.Direction.ASC, "dueAt").and(Sort.by(Sort.Direction.ASC, "id"));
@@ -510,26 +484,6 @@ public class SlaTaskService implements SlaTaskManagementService {
         ));
     }
 
-    private BusinessException notFound(String field, String message) {
-        return new BusinessException(
-                ErrorCode.RESOURCE_NOT_FOUND,
-                message,
-                List.of(ErrorDetail.of(field, "NOT_FOUND", message))
-        );
-    }
 
-    private BusinessException forbidden(String field, String code, String message) {
-        return new BusinessException(
-                ErrorCode.PERMISSION_DENIED,
-                message,
-                List.of(ErrorDetail.of(field, code, message))
-        );
-    }
 
-    private ValidationException validation(String field, String code, String message) {
-        return new ValidationException(
-                ErrorCode.VALIDATION_ERROR.defaultMessage(),
-                List.of(ErrorDetail.of(field, code, message))
-        );
-    }
 }

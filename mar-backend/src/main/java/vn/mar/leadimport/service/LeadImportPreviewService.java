@@ -28,6 +28,7 @@ import vn.mar.common.error.ErrorDetail;
 import vn.mar.common.exception.BusinessException;
 import vn.mar.common.exception.ValidationException;
 import vn.mar.common.logging.LogContext;
+import vn.mar.common.tenant.TenantContext;
 import vn.mar.common.time.TimeProvider;
 import vn.mar.lead.api.LeadNormalizationIssue;
 import vn.mar.lead.api.LeadNormalizationRequest;
@@ -107,7 +108,7 @@ public class LeadImportPreviewService {
     @Transactional
     public LeadImportPreviewResponse previewLeadImport(LeadImportPreviewRequest request, MultipartFile file) {
         CurrentUser actor = currentUserContext.currentUser();
-        UUID tenantId = requireTenantContext(actor);
+        UUID tenantId = TenantContext.requireTenantId(actor);
         validateFile(file);
         ParsedCsvLeadImport parsedFile = csvLeadImportParser.parse(file);
         if (parsedFile.rows().size() > MAX_CSV_ROWS) {
@@ -176,7 +177,7 @@ public class LeadImportPreviewService {
 
     private Map<LeadImportField, String> resolveMappings(LeadImportPreviewRequest request, List<String> headers) {
         if (request == null || request.columnMappings() == null || request.columnMappings().isEmpty()) {
-            throw validation("column_mappings", "REQUIRED", "Column mappings are required");
+            throw ValidationException.of("column_mappings", "REQUIRED", "Column mappings are required");
         }
         Map<String, String> headerLookup = new HashMap<>();
         for (String header : headers) {
@@ -499,12 +500,6 @@ public class LeadImportPreviewService {
         ));
     }
 
-    private UUID requireTenantContext(CurrentUser actor) {
-        if (actor.tenantId() == null) {
-            throw new BusinessException(ErrorCode.BUSINESS_RULE_VIOLATION, "Tenant context is required");
-        }
-        return actor.tenantId();
-    }
 
     private String rawValue(ParsedCsvLeadImportRow row, String sourceColumn) {
         if (!StringUtils.hasText(sourceColumn)) {
@@ -594,12 +589,6 @@ public class LeadImportPreviewService {
         return filename.length() <= 255 ? filename : filename.substring(filename.length() - 255);
     }
 
-    private ValidationException validation(String field, String code, String message) {
-        return new ValidationException(
-                ErrorCode.VALIDATION_ERROR.defaultMessage(),
-                List.of(ErrorDetail.of(field, code, message))
-        );
-    }
 
     private ErrorDetail toRowError(int rowNumber, LeadNormalizationIssue issue) {
         return ErrorDetail.of(

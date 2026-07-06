@@ -17,6 +17,7 @@ import vn.mar.common.error.ErrorDetail;
 import vn.mar.common.exception.BusinessException;
 import vn.mar.common.exception.ValidationException;
 import vn.mar.common.logging.LogContext;
+import vn.mar.common.tenant.TenantContext;
 import vn.mar.common.time.TimeProvider;
 import vn.mar.customer.api.CustomerMergeManagementService;
 import vn.mar.customer.api.MergeHistorySnapshot;
@@ -90,7 +91,7 @@ public class CustomerMergeService implements CustomerMergeManagementService {
     public MergeHistorySnapshot unmerge(UnmergeCustomerCommand command) {
         validateUnmergeCommand(command);
         CurrentUser actor = currentUserContext.currentUser();
-        UUID tenantId = requireTenantContext(actor);
+        UUID tenantId = TenantContext.requireTenantId(actor);
         assertHasPermission(actor, PermissionCodes.CUSTOMER_MERGE, "CUSTOMER_UNMERGE_DENIED", "Permission is required to unmerge customers");
         assertAdmin(actor);
         String reason = requireText(command.reason(), "reason", "Unmerge reason is required");
@@ -100,7 +101,7 @@ public class CustomerMergeService implements CustomerMergeManagementService {
                         tenantId,
                         command.customerId()
                 )
-                .orElseThrow(() -> notFound("merge_id", "Merge history not found"));
+                .orElseThrow(() -> BusinessException.notFound("merge_id", "Merge history not found"));
         if (!mergeHistory.canUnmerge() || mergeHistory.unmergedAt() != null) {
             throw new BusinessException(
                     ErrorCode.UNMERGE_NOT_ALLOWED,
@@ -140,13 +141,13 @@ public class CustomerMergeService implements CustomerMergeManagementService {
 
     private void validateUnmergeCommand(UnmergeCustomerCommand command) {
         if (command == null) {
-            throw validation("command", "REQUIRED", "Unmerge command is required");
+            throw ValidationException.of("command", "REQUIRED", "Unmerge command is required");
         }
         if (command.customerId() == null) {
-            throw validation("customer_id", "REQUIRED", "Customer id is required");
+            throw ValidationException.of("customer_id", "REQUIRED", "Customer id is required");
         }
         if (command.mergeId() == null) {
-            throw validation("merge_id", "REQUIRED", "Merge id is required");
+            throw ValidationException.of("merge_id", "REQUIRED", "Merge id is required");
         }
     }
 
@@ -162,12 +163,6 @@ public class CustomerMergeService implements CustomerMergeManagementService {
                 });
     }
 
-    private UUID requireTenantContext(CurrentUser actor) {
-        if (actor.tenantId() == null) {
-            throw new BusinessException(ErrorCode.BUSINESS_RULE_VIOLATION, "Tenant context is required");
-        }
-        return actor.tenantId();
-    }
 
     private void assertAdmin(CurrentUser actor) {
         if (!ADMIN_ROLE.equals(actor.roleCode())) {
@@ -191,25 +186,12 @@ public class CustomerMergeService implements CustomerMergeManagementService {
 
     private String requireText(String value, String field, String message) {
         if (!StringUtils.hasText(value)) {
-            throw validation(field, "REQUIRED", message);
+            throw ValidationException.of(field, "REQUIRED", message);
         }
         return value.trim();
     }
 
-    private BusinessException notFound(String field, String message) {
-        return new BusinessException(
-                ErrorCode.RESOURCE_NOT_FOUND,
-                message,
-                List.of(ErrorDetail.of(field, "NOT_FOUND", message))
-        );
-    }
 
-    private ValidationException validation(String field, String code, String message) {
-        return new ValidationException(
-                ErrorCode.VALIDATION_ERROR.defaultMessage(),
-                List.of(ErrorDetail.of(field, code, message))
-        );
-    }
 
     private void auditMerged(MergeHistory mergeHistory, CurrentUser actor, String reason) {
         auditService.record(new AuditRecordCommand(

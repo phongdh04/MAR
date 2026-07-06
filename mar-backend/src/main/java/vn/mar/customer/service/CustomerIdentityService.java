@@ -134,19 +134,19 @@ public class CustomerIdentityService {
 
     private void validateRegisterCommand(CustomerIdentityRegisterCommand command) {
         if (command == null) {
-            throw validation("command", "REQUIRED", "Customer identity command is required");
+            throw ValidationException.of("command", "REQUIRED", "Customer identity command is required");
         }
         if (command.tenantId() == null) {
-            throw validation("tenant_id", "REQUIRED", "Tenant id is required");
+            throw ValidationException.of("tenant_id", "REQUIRED", "Tenant id is required");
         }
         if (command.customerId() == null) {
-            throw validation("customer_id", "REQUIRED", "Customer id is required");
+            throw ValidationException.of("customer_id", "REQUIRED", "Customer id is required");
         }
         if (command.identityType() == null) {
-            throw validation("identity_type", "REQUIRED", "Identity type is required");
+            throw ValidationException.of("identity_type", "REQUIRED", "Identity type is required");
         }
         if (!StringUtils.hasText(command.rawValue())) {
-            throw validation("raw_value", "REQUIRED", "Identity raw value is required");
+            throw ValidationException.of("raw_value", "REQUIRED", "Identity raw value is required");
         }
     }
 
@@ -231,12 +231,6 @@ public class CustomerIdentityService {
         );
     }
 
-    private ValidationException validation(String field, String code, String message) {
-        return new ValidationException(
-                ErrorCode.VALIDATION_ERROR.defaultMessage(),
-                List.of(ErrorDetail.of(field, code, message))
-        );
-    }
 
     private ErrorDetail toErrorDetail(LeadNormalizationIssue issue) {
         return ErrorDetail.of(issue.field().code(), issue.code().name(), issue.message());

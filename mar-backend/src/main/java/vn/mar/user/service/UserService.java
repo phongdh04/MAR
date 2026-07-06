@@ -32,6 +32,9 @@ import vn.mar.common.exception.ResourceNotFoundException;
 import vn.mar.common.exception.ValidationException;
 import vn.mar.common.logging.LogContext;
 import vn.mar.common.pagination.PageResponse;
+import vn.mar.common.pagination.PageRequestFactory;
+import vn.mar.common.search.SearchText;
+import vn.mar.common.tenant.TenantContext;
 import vn.mar.common.time.TimeProvider;
 import vn.mar.role.model.RoleCode;
 import vn.mar.role.model.RoleStatus;
@@ -53,9 +56,6 @@ import vn.mar.userbranch.repository.UserBranchRepository;
 @Service
 public class UserService {
 
-    private static final int DEFAULT_PAGE = 0;
-    private static final int DEFAULT_SIZE = 20;
-    private static final int MAX_SIZE = 100;
 
     private final UserRepository userRepository;
     private final UserBranchRepository userBranchRepository;
@@ -88,7 +88,7 @@ public class UserService {
     @Transactional
     public UserDetailResponse createUser(CreateUserRequest request) {
         CurrentUser actor = currentUserContext.currentUser();
-        UUID tenantId = requireTenantContext(actor);
+        UUID tenantId = TenantContext.requireTenantId(actor);
         Instant now = timeProvider.now();
         UUID userId = UUID.randomUUID();
         String email = requireEmail(request.email());
@@ -125,7 +125,7 @@ public class UserService {
 
     @Transactional(readOnly = true)
     public UserDetailResponse getUser(UUID userId) {
-        UUID tenantId = requireTenantContext(currentUserContext.currentUser());
+        UUID tenantId = TenantContext.requireTenantId(currentUserContext.currentUser());
         User user = findUser(tenantId, userId);
         Set<UUID> branchIds = findActiveBranchIds(tenantId, userId);
         return userMapper.toDetailResponse(user, branchIds);
@@ -133,13 +133,11 @@ public class UserService {
 
     @Transactional(readOnly = true)
     public PageResponse<UserDetailResponse> searchUsers(UserSearchRequest request) {
-        UUID tenantId = requireTenantContext(currentUserContext.currentUser());
-        int page = resolvePage(request.page());
-        int size = resolveSize(request.size());
+        UUID tenantId = TenantContext.requireTenantId(currentUserContext.currentUser());
         UserStatus status = resolveWritableStatus(request.status(), null);
         String roleCode = resolveActiveRole(request.role(), false);
-        String keyword = normalizeKeyword(request.keyword());
-        PageRequest pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
+        String keyword = SearchText.keyword(request.keyword());
+        PageRequest pageable = PageRequestFactory.of(request.page(), request.size(), Sort.by(Sort.Direction.DESC, "createdAt"));
         Page<User> users = userRepository.search(tenantId, status, roleCode, keyword, pageable);
         List<UUID> userIds = users.getContent().stream().map(User::id).toList();
         Map<UUID, List<UUID>> branchIdsByUserId = findActiveBranchIdsByUserId(tenantId, userIds);
@@ -153,7 +151,7 @@ public class UserService {
     @Transactional
     public UserDetailResponse updateUser(UUID userId, UpdateUserRequest request) {
         CurrentUser actor = currentUserContext.currentUser();
-        UUID tenantId = requireTenantContext(actor);
+        UUID tenantId = TenantContext.requireTenantId(actor);
         Instant now = timeProvider.now();
         User user = findUser(tenantId, userId);
         List<UserBranch> activeAssignments = findActiveAssignments(tenantId, userId);
@@ -230,7 +228,7 @@ public class UserService {
 
     private String requireFullName(String fullName) {
         if (!StringUtils.hasText(fullName)) {
-            throw validation("full_name", "REQUIRED", "Full name is required");
+            throw ValidationException.of("full_name", "REQUIRED", "Full name is required");
         }
         return fullName.trim();
     }
@@ -244,7 +242,7 @@ public class UserService {
 
     private String requireEmail(String email) {
         if (!StringUtils.hasText(email)) {
-            throw validation("email", "REQUIRED", "Email is required");
+            throw ValidationException.of("email", "REQUIRED", "Email is required");
         }
         return email.trim().toLowerCase(Locale.ROOT);
     }
@@ -278,7 +276,7 @@ public class UserService {
     private String resolveActiveRole(String requestedRole, boolean required) {
         if (!StringUtils.hasText(requestedRole)) {
             if (required) {
-                throw validation("role", "REQUIRED", "Role is required");
+                throw ValidationException.of("role", "REQUIRED", "Role is required");
             }
             return null;
         }
@@ -286,7 +284,7 @@ public class UserService {
         try {
             RoleCode.valueOf(roleCode);
         } catch (IllegalArgumentException exception) {
-            throw validation("role", "INVALID_ROLE", "Role is invalid");
+            throw ValidationException.of("role", "INVALID_ROLE", "Role is invalid");
         }
         if (!roleRepository.existsByRoleCodeAndStatus(roleCode, RoleStatus.ACTIVE)) {
             throw new BusinessException(ErrorCode.INVALID_PARENT_STATUS, "Role is inactive or not found");
@@ -299,16 +297,16 @@ public class UserService {
             return fallbackStatus;
         }
         if (!StringUtils.hasText(requestedStatus)) {
-            throw validation("status", "INVALID_STATUS", "User status is invalid");
+            throw ValidationException.of("status", "INVALID_STATUS", "User status is invalid");
         }
         try {
             UserStatus status = UserStatus.valueOf(requestedStatus.trim().toUpperCase(Locale.ROOT));
             if (status == UserStatus.ACTIVE || status == UserStatus.INACTIVE) {
                 return status;
             }
-            throw validation("status", "INVALID_STATUS", "User status is invalid");
+            throw ValidationException.of("status", "INVALID_STATUS", "User status is invalid");
         } catch (IllegalArgumentException exception) {
-            throw validation("status", "INVALID_STATUS", "User status is invalid");
+            throw ValidationException.of("status", "INVALID_STATUS", "User status is invalid");
         }
     }
 
@@ -437,40 +435,6 @@ public class UserService {
         }
     }
 
-    private int resolvePage(Integer requestedPage) {
-        if (requestedPage == null) {
-            return DEFAULT_PAGE;
-        }
-        if (requestedPage < 0) {
-            throw validation("page", "MIN_VALUE", "Page must be greater than or equal to 0");
-        }
-        return requestedPage;
-    }
-
-    private int resolveSize(Integer requestedSize) {
-        if (requestedSize == null) {
-            return DEFAULT_SIZE;
-        }
-        if (requestedSize < 1 || requestedSize > MAX_SIZE) {
-            throw validation("size", "INVALID_SIZE", "Size must be between 1 and 100");
-        }
-        return requestedSize;
-    }
-
-    private String normalizeKeyword(String keyword) {
-        if (!StringUtils.hasText(keyword)) {
-            return null;
-        }
-        return keyword.trim().toLowerCase(Locale.ROOT);
-    }
-
-    private UUID requireTenantContext(CurrentUser actor) {
-        if (actor.tenantId() == null) {
-            throw new BusinessException(ErrorCode.BUSINESS_RULE_VIOLATION, "Tenant context is required");
-        }
-        return actor.tenantId();
-    }
-
     private void auditUserChange(
             String action,
             CurrentUser actor,
@@ -503,12 +467,6 @@ public class UserService {
         return metadata;
     }
 
-    private ValidationException validation(String field, String code, String message) {
-        return new ValidationException(
-                ErrorCode.VALIDATION_ERROR.defaultMessage(),
-                List.of(ErrorDetail.of(field, code, message))
-        );
-    }
 
     private record BranchAssignmentChange(Set<UUID> afterBranchIds, boolean changed) {
     }

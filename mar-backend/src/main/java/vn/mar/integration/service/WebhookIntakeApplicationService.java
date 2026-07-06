@@ -91,19 +91,19 @@ public class WebhookIntakeApplicationService implements WebhookIntakeService {
 
     private void validateCommand(WebhookIntakeCommand command, LeadSourceType expectedSourceType) {
         if (command == null) {
-            throw validation("command", "REQUIRED", "Webhook command is required");
+            throw ValidationException.of("command", "REQUIRED", "Webhook command is required");
         }
         if (command.sourceType() != expectedSourceType) {
-            throw validation("source_type", "INVALID_SOURCE_TYPE", "Webhook source type is invalid");
+            throw ValidationException.of("source_type", "INVALID_SOURCE_TYPE", "Webhook source type is invalid");
         }
     }
 
     private JsonNode requirePayload(JsonNode payload) {
         if (payload == null || payload.isNull()) {
-            throw validation("payload", "REQUIRED", "Webhook payload is required");
+            throw ValidationException.of("payload", "REQUIRED", "Webhook payload is required");
         }
         if (!payload.isObject()) {
-            throw validation("payload", "INVALID_JSON_OBJECT", "Webhook payload must be a JSON object");
+            throw ValidationException.of("payload", "INVALID_JSON_OBJECT", "Webhook payload must be a JSON object");
         }
         return payload;
     }
@@ -213,7 +213,7 @@ public class WebhookIntakeApplicationService implements WebhookIntakeService {
         }
         String normalized = value.trim();
         if (normalized.length() > maxLength) {
-            throw validation(field, "INVALID_SIZE", "Value is too long");
+            throw ValidationException.of(field, "INVALID_SIZE", "Value is too long");
         }
         return normalized;
     }
@@ -222,10 +222,4 @@ public class WebhookIntakeApplicationService implements WebhookIntakeService {
         return new BusinessException(errorCode, message, List.of(ErrorDetail.of(field, detailCode, message)));
     }
 
-    private ValidationException validation(String field, String code, String message) {
-        return new ValidationException(
-                ErrorCode.VALIDATION_ERROR.defaultMessage(),
-                List.of(ErrorDetail.of(field, code, message))
-        );
-    }
 }

@@ -38,7 +38,8 @@ class FlywayMigrationNamingTest {
                         "V20260703_02__create_customer_identities.sql",
                         "V20260703_03__create_duplicate_cases.sql",
                         "V20260703_04__add_duplicate_manage_permission.sql",
-                        "V20260703_05__create_merge_history.sql"
+                        "V20260703_05__create_merge_history.sql",
+                        "V20260706_01__create_admission_opportunity_foundation.sql"
                 )
                 .allMatch(fileName -> FLYWAY_NAME_PATTERN.matcher(fileName).matches());
     }

@@ -61,7 +61,7 @@ public class AssignmentController {
         PageResponse<AssignmentRuleSnapshot> snapshots = assignmentRuleService.searchRules(
                 new AssignmentRuleSearchCommand(status, branchId, page, size)
         );
-        return ResponseEntity.ok(ApiResponse.success(toRuleResponsePage(snapshots)));
+        return ResponseEntity.ok(ApiResponse.success(snapshots.map(assignmentMapper::toResponse)));
     }
 
     @GetMapping("/assignment-rules/{assignmentRuleId}")
@@ -100,7 +100,7 @@ public class AssignmentController {
         PageResponse<UnassignedAssignmentItemSnapshot> snapshots = assignmentRuleService.searchUnassignedItems(
                 new UnassignedAssignmentItemSearchCommand(status, branchId, page, size)
         );
-        return ResponseEntity.ok(ApiResponse.success(toUnassignedResponsePage(snapshots)));
+        return ResponseEntity.ok(ApiResponse.success(snapshots.map(assignmentMapper::toResponse)));
     }
 
     @PostMapping("/assignments/opportunities/{opportunityId}")
@@ -118,24 +118,4 @@ public class AssignmentController {
         return ResponseEntity.ok(ApiResponse.success(assignmentMapper.toResponse(snapshot)));
     }
 
-    private PageResponse<AssignmentRuleResponse> toRuleResponsePage(PageResponse<AssignmentRuleSnapshot> snapshots) {
-        return new PageResponse<>(
-                snapshots.items().stream().map(assignmentMapper::toResponse).toList(),
-                snapshots.page(),
-                snapshots.size(),
-                snapshots.totalElements(),
-                snapshots.totalPages()
-        );
-    }
-
-    private PageResponse<UnassignedAssignmentItemResponse> toUnassignedResponsePage(
-            PageResponse<UnassignedAssignmentItemSnapshot> snapshots) {
-        return new PageResponse<>(
-                snapshots.items().stream().map(assignmentMapper::toResponse).toList(),
-                snapshots.page(),
-                snapshots.size(),
-                snapshots.totalElements(),
-                snapshots.totalPages()
-        );
-    }
 }

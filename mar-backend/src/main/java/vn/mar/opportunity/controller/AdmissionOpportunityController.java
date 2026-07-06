@@ -61,7 +61,7 @@ public class AdmissionOpportunityController {
         PageResponse<AdmissionOpportunitySnapshot> snapshots = admissionOpportunityManagementService.searchOpportunities(
                 new AdmissionOpportunitySearchCommand(ownerId, stage, languageId, programId, page, size)
         );
-        return ResponseEntity.ok(ApiResponse.success(toResponsePage(snapshots)));
+        return ResponseEntity.ok(ApiResponse.success(snapshots.map(admissionOpportunityMapper::toResponse)));
     }
 
     @GetMapping("/{opportunityId}")
@@ -89,7 +89,7 @@ public class AdmissionOpportunityController {
         PageResponse<OpportunityActivitySnapshot> snapshots = admissionOpportunityManagementService.searchActivities(
                 new OpportunityActivitySearchCommand(opportunityId, page, size)
         );
-        return ResponseEntity.ok(ApiResponse.success(toActivityResponsePage(snapshots)));
+        return ResponseEntity.ok(ApiResponse.success(snapshots.map(admissionOpportunityMapper::toResponse)));
     }
 
     @PostMapping("/{opportunityId}/activities")
@@ -147,27 +147,4 @@ public class AdmissionOpportunityController {
         return ResponseEntity.ok(ApiResponse.success(admissionOpportunityMapper.toResponse(snapshot)));
     }
 
-    private PageResponse<OpportunityResponse> toResponsePage(PageResponse<AdmissionOpportunitySnapshot> snapshots) {
-        return new PageResponse<>(
-                snapshots.items().stream()
-                        .map(admissionOpportunityMapper::toResponse)
-                        .toList(),
-                snapshots.page(),
-                snapshots.size(),
-                snapshots.totalElements(),
-                snapshots.totalPages()
-        );
-    }
-
-    private PageResponse<OpportunityActivityResponse> toActivityResponsePage(PageResponse<OpportunityActivitySnapshot> snapshots) {
-        return new PageResponse<>(
-                snapshots.items().stream()
-                        .map(admissionOpportunityMapper::toResponse)
-                        .toList(),
-                snapshots.page(),
-                snapshots.size(),
-                snapshots.totalElements(),
-                snapshots.totalPages()
-        );
-    }
 }

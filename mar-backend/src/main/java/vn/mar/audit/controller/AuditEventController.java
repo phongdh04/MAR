@@ -59,7 +59,7 @@ public class AuditEventController {
                 page,
                 size
         ));
-        return ResponseEntity.ok(ApiResponse.success(toResponsePage(snapshots)));
+        return ResponseEntity.ok(ApiResponse.success(snapshots.map(auditEventMapper::toResponse)));
     }
 
     @GetMapping("/{auditEventId}")
@@ -70,15 +70,4 @@ public class AuditEventController {
         )));
     }
 
-    private PageResponse<AuditEventResponse> toResponsePage(PageResponse<AuditEventSnapshot> snapshots) {
-        return new PageResponse<>(
-                snapshots.items().stream()
-                        .map(auditEventMapper::toResponse)
-                        .toList(),
-                snapshots.page(),
-                snapshots.size(),
-                snapshots.totalElements(),
-                snapshots.totalPages()
-        );
-    }
 }

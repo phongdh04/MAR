@@ -63,7 +63,7 @@ public class IntegrationEventController {
                 page,
                 size
         ));
-        return ResponseEntity.ok(ApiResponse.success(toResponsePage(snapshots)));
+        return ResponseEntity.ok(ApiResponse.success(snapshots.map(integrationEventMapper::toResponse)));
     }
 
     @GetMapping("/{eventId}")
@@ -74,15 +74,4 @@ public class IntegrationEventController {
         )));
     }
 
-    private PageResponse<IntegrationEventResponse> toResponsePage(PageResponse<IntegrationEventSnapshot> snapshots) {
-        return new PageResponse<>(
-                snapshots.items().stream()
-                        .map(integrationEventMapper::toResponse)
-                        .toList(),
-                snapshots.page(),
-                snapshots.size(),
-                snapshots.totalElements(),
-                snapshots.totalPages()
-        );
-    }
 }

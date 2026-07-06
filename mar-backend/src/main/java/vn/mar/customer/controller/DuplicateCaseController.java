@@ -45,7 +45,7 @@ public class DuplicateCaseController {
         PageResponse<DuplicateCaseSnapshot> snapshots = duplicateCaseManagementService.searchCases(
                 new DuplicateCaseSearchCommand(status, matchType, page, size)
         );
-        return ResponseEntity.ok(ApiResponse.success(toResponsePage(snapshots)));
+        return ResponseEntity.ok(ApiResponse.success(snapshots.map(duplicateCaseMapper::toResponse)));
     }
 
     @GetMapping("/{caseId}")
@@ -66,15 +66,4 @@ public class DuplicateCaseController {
         return ResponseEntity.ok(ApiResponse.success(duplicateCaseMapper.toResponse(snapshot)));
     }
 
-    private PageResponse<DuplicateCaseResponse> toResponsePage(PageResponse<DuplicateCaseSnapshot> snapshots) {
-        return new PageResponse<>(
-                snapshots.items().stream()
-                        .map(duplicateCaseMapper::toResponse)
-                        .toList(),
-                snapshots.page(),
-                snapshots.size(),
-                snapshots.totalElements(),
-                snapshots.totalPages()
-        );
-    }
 }

@@ -44,7 +44,7 @@ public class SlaTaskController {
         PageResponse<SlaTaskSnapshot> snapshots = slaTaskManagementService.searchTasks(
                 new SlaTaskSearchCommand(ownerId, branchId, status, taskType, page, size)
         );
-        return ResponseEntity.ok(ApiResponse.success(toResponsePage(snapshots)));
+        return ResponseEntity.ok(ApiResponse.success(snapshots.map(slaTaskMapper::toResponse)));
     }
 
     @PostMapping("/overdue-scan")
@@ -54,15 +54,4 @@ public class SlaTaskController {
         return ResponseEntity.ok(ApiResponse.success(slaTaskMapper.toResponse(snapshot)));
     }
 
-    private PageResponse<SlaTaskResponse> toResponsePage(PageResponse<SlaTaskSnapshot> snapshots) {
-        return new PageResponse<>(
-                snapshots.items().stream()
-                        .map(slaTaskMapper::toResponse)
-                        .toList(),
-                snapshots.page(),
-                snapshots.size(),
-                snapshots.totalElements(),
-                snapshots.totalPages()
-        );
-    }
 }

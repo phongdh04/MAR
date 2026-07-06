@@ -71,6 +71,8 @@ import vn.mar.opportunity.repository.StageHistoryRepository;
 import vn.mar.opportunity.repository.TouchpointRepository;
 import vn.mar.security.context.CurrentUser;
 import vn.mar.security.context.CurrentUserContext;
+import vn.mar.sla.api.CompleteFirstResponseSlaTaskCommand;
+import vn.mar.sla.api.SlaTaskManagementService;
 import vn.mar.user.entity.User;
 import vn.mar.user.model.UserStatus;
 import vn.mar.user.repository.UserRepository;
@@ -130,6 +132,9 @@ class AdmissionOpportunityServiceTest {
     @Mock
     private AuditService auditService;
 
+    @Mock
+    private SlaTaskManagementService slaTaskManagementService;
+
     private AdmissionOpportunityService admissionOpportunityService;
 
     @BeforeEach
@@ -148,6 +153,7 @@ class AdmissionOpportunityServiceTest {
                 branchRepository,
                 userRepository,
                 new AdmissionOpportunityMapper(),
+                slaTaskManagementService,
                 timeProvider,
                 currentUserContext,
                 auditService
@@ -358,6 +364,12 @@ class AdmissionOpportunityServiceTest {
         assertThat(auditCaptor.getValue().afterData())
                 .containsEntry("note_present", true)
                 .doesNotContainValue("Customer shared private budget context");
+        ArgumentCaptor<CompleteFirstResponseSlaTaskCommand> slaCommandCaptor =
+                ArgumentCaptor.forClass(CompleteFirstResponseSlaTaskCommand.class);
+        verify(slaTaskManagementService).completeFirstResponseTask(slaCommandCaptor.capture());
+        assertThat(slaCommandCaptor.getValue().opportunityId()).isEqualTo(OPPORTUNITY_ID);
+        assertThat(slaCommandCaptor.getValue().activityId()).isEqualTo(snapshot.activityId());
+        assertThat(slaCommandCaptor.getValue().occurredAt()).isEqualTo(NOW.plusSeconds(30));
     }
 
     @Test

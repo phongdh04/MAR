@@ -44,6 +44,8 @@ import vn.mar.opportunity.api.OpportunityAssignmentService;
 import vn.mar.opportunity.api.OpportunityAssignmentSnapshot;
 import vn.mar.security.context.CurrentUser;
 import vn.mar.security.context.CurrentUserContext;
+import vn.mar.sla.api.OpenFirstResponseSlaTaskCommand;
+import vn.mar.sla.api.SlaTaskManagementService;
 import vn.mar.user.entity.User;
 import vn.mar.user.model.UserStatus;
 import vn.mar.user.repository.UserRepository;
@@ -85,6 +87,9 @@ class DefaultAssignmentEngineServiceTest {
     private OpportunityAssignmentService opportunityAssignmentService;
 
     @Mock
+    private SlaTaskManagementService slaTaskManagementService;
+
+    @Mock
     private UserRepository userRepository;
 
     @Mock
@@ -108,6 +113,7 @@ class DefaultAssignmentEngineServiceTest {
                 assignmentHistoryRepository,
                 unassignedAssignmentItemRepository,
                 opportunityAssignmentService,
+                slaTaskManagementService,
                 userRepository,
                 userBranchRepository,
                 currentUserContext,
@@ -150,6 +156,12 @@ class DefaultAssignmentEngineServiceTest {
         assertThat(commandCaptor.getValue().ownerId()).isEqualTo(ADVISOR_B_ID);
         assertThat(commandCaptor.getValue().assignmentRuleId()).isEqualTo(RULE_ID);
         verify(assignmentHistoryRepository).save(any(AssignmentHistory.class));
+        ArgumentCaptor<OpenFirstResponseSlaTaskCommand> slaCommandCaptor =
+                ArgumentCaptor.forClass(OpenFirstResponseSlaTaskCommand.class);
+        verify(slaTaskManagementService).openFirstResponseTask(slaCommandCaptor.capture());
+        assertThat(slaCommandCaptor.getValue().opportunityId()).isEqualTo(OPPORTUNITY_ID);
+        assertThat(slaCommandCaptor.getValue().ownerId()).isEqualTo(ADVISOR_B_ID);
+        assertThat(slaCommandCaptor.getValue().leadTemperature().name()).isEqualTo("HOT");
     }
 
     @Test
@@ -177,6 +189,7 @@ class DefaultAssignmentEngineServiceTest {
         assertThat(result.assignedOwnerId()).isEqualTo(ADVISOR_A_ID);
         assertThat(result.assignmentRuleId()).isNull();
         assertThat(result.fallbackApplied()).isTrue();
+        verify(slaTaskManagementService).openFirstResponseTask(any(OpenFirstResponseSlaTaskCommand.class));
     }
 
     @Test
@@ -203,6 +216,7 @@ class DefaultAssignmentEngineServiceTest {
         assertThat(result.unassignedReasonCode()).isEqualTo(UnassignedReasonCode.NO_ACTIVE_ADVISOR.name());
         assertThat(result.unassignedItemId()).isNotNull();
         verify(opportunityAssignmentService, never()).assignOwner(any());
+        verify(slaTaskManagementService, never()).openFirstResponseTask(any());
     }
 
     private void allowAssignmentManage() {

@@ -33,6 +33,8 @@ public final class AuditActions {
     public static final String OPPORTUNITY_STAGE_CHANGED = "OPPORTUNITY_STAGE_CHANGED";
     public static final String TOUCHPOINT_CREATED = "TOUCHPOINT_CREATED";
     public static final String ACTIVITY_CREATED = "ACTIVITY_CREATED";
+    public static final String WORKING_HOURS_UPDATED = "WORKING_HOURS_UPDATED";
+    public static final String SLA_POLICY_UPDATED = "SLA_POLICY_UPDATED";
 
     private AuditActions() {
     }

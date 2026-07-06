@@ -18,6 +18,8 @@ public final class AuditResourceTypes {
     public static final String STAGE_HISTORY = "STAGE_HISTORY";
     public static final String TOUCHPOINT = "TOUCHPOINT";
     public static final String ACTIVITY = "ACTIVITY";
+    public static final String WORKING_HOURS_CONFIG = "WORKING_HOURS_CONFIG";
+    public static final String SLA_POLICY = "SLA_POLICY";
 
     private AuditResourceTypes() {
     }

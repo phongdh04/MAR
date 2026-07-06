@@ -37,4 +37,17 @@ public interface AdmissionOpportunityRepository extends JpaRepository<AdmissionO
             @Param("languageId") UUID languageId,
             @Param("programId") UUID programId,
             Pageable pageable);
+
+    @Query("""
+            select opportunity.ownerId as ownerId, count(opportunity) as workload
+            from AdmissionOpportunity opportunity
+            where opportunity.tenantId = :tenantId
+              and opportunity.ownerId in :ownerIds
+              and opportunity.currentStage in :activeStages
+            group by opportunity.ownerId
+            """)
+    java.util.List<AdmissionOpportunityWorkloadProjection> countActiveWorkloads(
+            @Param("tenantId") UUID tenantId,
+            @Param("ownerIds") Collection<UUID> ownerIds,
+            @Param("activeStages") Collection<OpportunityStage> activeStages);
 }

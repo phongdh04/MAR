@@ -1,5 +1,7 @@
 package vn.mar.user.repository;
 
+import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.domain.Page;
@@ -15,6 +17,14 @@ public interface UserRepository extends JpaRepository<User, UUID> {
     Optional<User> findByIdAndTenantId(UUID id, UUID tenantId);
 
     Optional<User> findByTenantIdAndEmailIgnoreCase(UUID tenantId, String email);
+
+    List<User> findByTenantIdAndIdInAndStatusAndRoleCode(
+            UUID tenantId,
+            Collection<UUID> ids,
+            UserStatus status,
+            String roleCode);
+
+    List<User> findByTenantIdAndStatusAndRoleCode(UUID tenantId, UserStatus status, String roleCode);
 
     boolean existsByTenantIdAndEmailIgnoreCase(UUID tenantId, String email);
 

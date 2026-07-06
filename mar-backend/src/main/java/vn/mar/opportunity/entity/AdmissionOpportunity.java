@@ -196,6 +196,11 @@ public class AdmissionOpportunity {
         updatedAt = now;
     }
 
+    public void assignOwner(UUID ownerId, Instant now) {
+        this.ownerId = ownerId;
+        this.updatedAt = now;
+    }
+
     public UUID id() {
         return id;
     }

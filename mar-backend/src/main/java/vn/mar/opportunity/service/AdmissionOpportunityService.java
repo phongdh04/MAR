@@ -2,6 +2,7 @@ package vn.mar.opportunity.service;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Collection;
 import java.util.EnumSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -44,12 +45,15 @@ import vn.mar.lead.entity.Lead;
 import vn.mar.lead.model.LeadSourceType;
 import vn.mar.lead.model.LeadTemperature;
 import vn.mar.lead.repository.LeadRepository;
+import vn.mar.opportunity.api.AssignOpportunityOwnerCommand;
 import vn.mar.opportunity.api.AdmissionOpportunityManagementService;
 import vn.mar.opportunity.api.AdmissionOpportunitySearchCommand;
 import vn.mar.opportunity.api.AdmissionOpportunitySnapshot;
 import vn.mar.opportunity.api.ChangeOpportunityStageCommand;
 import vn.mar.opportunity.api.CreateAdmissionOpportunityCommand;
 import vn.mar.opportunity.api.CreateOpportunityActivityCommand;
+import vn.mar.opportunity.api.OpportunityAssignmentService;
+import vn.mar.opportunity.api.OpportunityAssignmentSnapshot;
 import vn.mar.opportunity.api.OpportunityActivitySearchCommand;
 import vn.mar.opportunity.api.OpportunityActivitySnapshot;
 import vn.mar.opportunity.api.StageChangeSnapshot;
@@ -79,7 +83,7 @@ import vn.mar.user.model.UserStatus;
 import vn.mar.user.repository.UserRepository;
 
 @Service
-public class AdmissionOpportunityService implements AdmissionOpportunityManagementService {
+public class AdmissionOpportunityService implements AdmissionOpportunityManagementService, OpportunityAssignmentService {
 
     private static final int DEFAULT_PAGE = 0;
     private static final int DEFAULT_SIZE = 20;
@@ -404,6 +408,46 @@ public class AdmissionOpportunityService implements AdmissionOpportunityManageme
         );
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public OpportunityAssignmentSnapshot getAssignmentSnapshot(UUID tenantId, UUID opportunityId) {
+        requireId(tenantId, "tenant_id", "Tenant id is required");
+        AdmissionOpportunity opportunity = findOpportunity(tenantId, opportunityId);
+        return toAssignmentSnapshot(opportunity);
+    }
+
+    @Override
+    @Transactional
+    public OpportunityAssignmentSnapshot assignOwner(AssignOpportunityOwnerCommand command) {
+        validateAssignOwnerCommand(command);
+        Instant now = timeProvider.now();
+        AdmissionOpportunity opportunity = findOpportunity(command.tenantId(), command.opportunityId());
+        User owner = userRepository.findByIdAndTenantId(command.ownerId(), command.tenantId())
+                .orElseThrow(() -> notFound("owner_id", "Owner user not found"));
+        validateAssignableOwner(owner);
+
+        Map<String, Object> beforeData = admissionOpportunityMapper.toAuditData(opportunity);
+        UUID fromOwnerId = opportunity.ownerId();
+        opportunity.assignOwner(owner.id(), now);
+        AdmissionOpportunity savedOpportunity = admissionOpportunityRepository.save(opportunity);
+        auditOpportunityAssignment(savedOpportunity, currentUserOrSystem(command.assignedBy(), command.tenantId()), beforeData, fromOwnerId, command);
+        return toAssignmentSnapshot(savedOpportunity);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Map<UUID, Long> countActiveOwnedOpportunities(UUID tenantId, Collection<UUID> ownerIds) {
+        requireId(tenantId, "tenant_id", "Tenant id is required");
+        if (ownerIds == null || ownerIds.isEmpty()) {
+            return Map.of();
+        }
+        Map<UUID, Long> workloads = new LinkedHashMap<>();
+        ownerIds.forEach(ownerId -> workloads.put(ownerId, 0L));
+        admissionOpportunityRepository.countActiveWorkloads(tenantId, ownerIds, ACTIVE_DUPLICATE_STAGES)
+                .forEach(row -> workloads.put(row.getOwnerId(), row.getWorkload()));
+        return workloads;
+    }
+
     private AdmissionOpportunity createNewOpportunity(
             UUID tenantId,
             UUID customerId,
@@ -506,6 +550,15 @@ public class AdmissionOpportunityService implements AdmissionOpportunityManageme
         if (!StringUtils.hasText(command.source())) {
             throw validation("source", "REQUIRED", "Activity source is required");
         }
+    }
+
+    private void validateAssignOwnerCommand(AssignOpportunityOwnerCommand command) {
+        if (command == null) {
+            throw validation("command", "REQUIRED", "Opportunity assignment command is required");
+        }
+        requireId(command.tenantId(), "tenant_id", "Tenant id is required");
+        requireId(command.opportunityId(), "opportunity_id", "Opportunity id is required");
+        requireId(command.ownerId(), "owner_id", "Owner id is required");
     }
 
     private Lead findLead(UUID tenantId, UUID leadId) {
@@ -653,6 +706,19 @@ public class AdmissionOpportunityService implements AdmissionOpportunityManageme
             throw inactiveParent("owner_id", "Owner user is inactive");
         }
         return user.id();
+    }
+
+    private void validateAssignableOwner(User owner) {
+        if (owner.status() != UserStatus.ACTIVE) {
+            throw inactiveParent("owner_id", "Owner user is inactive");
+        }
+        if (!"ADVISOR".equals(owner.roleCode())) {
+            throw new BusinessException(
+                    ErrorCode.BUSINESS_RULE_VIOLATION,
+                    "Owner must be an advisor",
+                    List.of(ErrorDetail.of("owner_id", "ADVISOR_ROLE_REQUIRED", "Owner must be an advisor"))
+            );
+        }
     }
 
     private OpportunityStage resolveStage(String requestedStage) {
@@ -937,6 +1003,14 @@ public class AdmissionOpportunityService implements AdmissionOpportunityManageme
         }
     }
 
+    private CurrentUser currentUserOrSystem(UUID fallbackActorId, UUID fallbackTenantId) {
+        try {
+            return currentUserContext.currentUser();
+        } catch (RuntimeException exception) {
+            return new CurrentUser(fallbackActorId, fallbackTenantId, "SYSTEM", Set.of(), LogContext.requestId());
+        }
+    }
+
     private void auditOpportunityChange(
             String action,
             AdmissionOpportunity opportunity,
@@ -1047,6 +1121,35 @@ public class AdmissionOpportunityService implements AdmissionOpportunityManageme
         ));
     }
 
+    private void auditOpportunityAssignment(
+            AdmissionOpportunity opportunity,
+            CurrentUser actor,
+            Map<String, Object> beforeData,
+            UUID fromOwnerId,
+            AssignOpportunityOwnerCommand command) {
+        Map<String, Object> metadata = auditMetadata(actor);
+        metadata.put("assignment_rule_id", command.assignmentRuleId() == null ? null : command.assignmentRuleId().toString());
+        metadata.put("assignment_source", command.assignmentSource());
+        metadata.put("assignment_strategy", command.assignmentStrategy());
+        metadata.put("from_owner_id", fromOwnerId == null ? null : fromOwnerId.toString());
+        metadata.put("to_owner_id", command.ownerId().toString());
+        auditService.record(new AuditRecordCommand(
+                opportunity.tenantId(),
+                actor.actorId(),
+                actor.actorId() == null ? "SYSTEM" : "USER",
+                actor.roleCode(),
+                AuditActions.OPPORTUNITY_ASSIGNED,
+                AuditResourceTypes.ADMISSION_OPPORTUNITY,
+                opportunity.id(),
+                opportunity.id().toString(),
+                beforeData,
+                admissionOpportunityMapper.toAuditData(opportunity),
+                metadata,
+                normalizeOptional(command.reason()),
+                LogContext.requestId()
+        ));
+    }
+
     private Map<String, Object> auditMetadata(CurrentUser actor) {
         Map<String, Object> metadata = new LinkedHashMap<>();
         if (actor.tenantId() != null) {
@@ -1057,6 +1160,22 @@ public class AdmissionOpportunityService implements AdmissionOpportunityManageme
 
     private <T> T firstNonNull(T preferred, T fallback) {
         return preferred == null ? fallback : preferred;
+    }
+
+    private OpportunityAssignmentSnapshot toAssignmentSnapshot(AdmissionOpportunity opportunity) {
+        return new OpportunityAssignmentSnapshot(
+                opportunity.id(),
+                opportunity.tenantId(),
+                opportunity.sourceLeadId(),
+                opportunity.languageId(),
+                opportunity.programId(),
+                opportunity.branchId(),
+                opportunity.ownerId(),
+                opportunity.currentStage().name(),
+                opportunity.leadTemperature() == null ? null : opportunity.leadTemperature().name(),
+                opportunity.createdAt(),
+                opportunity.updatedAt()
+        );
     }
 
     private record CatalogSelection(UUID languageId, UUID programId, UUID courseId) {

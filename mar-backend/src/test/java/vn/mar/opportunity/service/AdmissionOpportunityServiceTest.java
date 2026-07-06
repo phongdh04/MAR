@@ -7,6 +7,7 @@ import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.never;
 
 import java.time.Instant;
 import java.util.List;
@@ -45,6 +46,7 @@ import vn.mar.opportunity.api.AdmissionOpportunitySnapshot;
 import vn.mar.opportunity.api.ChangeOpportunityStageCommand;
 import vn.mar.opportunity.api.StageChangeSnapshot;
 import vn.mar.opportunity.api.CreateAdmissionOpportunityCommand;
+import vn.mar.opportunity.api.StageHistorySnapshot;
 import vn.mar.opportunity.entity.AdmissionOpportunity;
 import vn.mar.opportunity.entity.StageHistory;
 import vn.mar.opportunity.entity.Touchpoint;
@@ -242,6 +244,70 @@ class AdmissionOpportunityServiceTest {
                 .isInstanceOf(BusinessException.class)
                 .extracting("errorCode")
                 .isEqualTo(ErrorCode.PERMISSION_DENIED);
+    }
+
+    @Test
+    void getStageHistory_whenLeadViewPermission_shouldReturnTimeline() {
+        allowAdmin("lead.view");
+        when(admissionOpportunityRepository.findByIdAndTenantId(OPPORTUNITY_ID, TENANT_ID))
+                .thenReturn(Optional.of(opportunity(OPPORTUNITY_ID, LEAD_ID, ACTOR_ID)));
+        StageHistory firstHistory = StageHistory.create(
+                UUID.fromString("77777777-7777-7777-7777-777777777777"),
+                TENANT_ID,
+                OPPORTUNITY_ID,
+                OpportunityStage.NEW,
+                OpportunityStage.CONTACTING,
+                ACTOR_ID,
+                "USER",
+                NOW,
+                "Started handling",
+                0L
+        );
+        StageHistory secondHistory = StageHistory.create(
+                UUID.fromString("88888888-8888-8888-8888-888888888888"),
+                TENANT_ID,
+                OPPORTUNITY_ID,
+                OpportunityStage.CONTACTING,
+                OpportunityStage.CONTACTED,
+                ACTOR_ID,
+                "USER",
+                NOW.plusSeconds(3600),
+                "Customer answered",
+                3600L
+        );
+        when(stageHistoryRepository.findByTenantIdAndOpportunityIdOrderByChangedAtAscIdAsc(TENANT_ID, OPPORTUNITY_ID))
+                .thenReturn(List.of(firstHistory, secondHistory));
+
+        List<StageHistorySnapshot> timeline = admissionOpportunityService.getStageHistory(OPPORTUNITY_ID);
+
+        assertThat(timeline).hasSize(2);
+        assertThat(timeline)
+                .extracting(StageHistorySnapshot::fromStage)
+                .containsExactly("NEW", "CONTACTING");
+        assertThat(timeline)
+                .extracting(StageHistorySnapshot::toStage)
+                .containsExactly("CONTACTING", "CONTACTED");
+        assertThat(timeline.get(1).durationInPreviousStageSeconds()).isEqualTo(3600L);
+        verify(stageHistoryRepository).findByTenantIdAndOpportunityIdOrderByChangedAtAscIdAsc(TENANT_ID, OPPORTUNITY_ID);
+    }
+
+    @Test
+    void getStageHistory_whenAdvisorReadsOtherOwnerOpportunity_shouldRejectBeforeTimelineQuery() {
+        when(currentUserContext.currentUser()).thenReturn(new CurrentUser(
+                OWNER_ID,
+                TENANT_ID,
+                "ADVISOR",
+                Set.of("lead.view"),
+                "req_opp_unit_001"
+        ));
+        when(admissionOpportunityRepository.findByIdAndTenantId(OPPORTUNITY_ID, TENANT_ID))
+                .thenReturn(Optional.of(opportunity(OPPORTUNITY_ID, LEAD_ID, OTHER_OWNER_ID)));
+
+        assertThatThrownBy(() -> admissionOpportunityService.getStageHistory(OPPORTUNITY_ID))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.PERMISSION_DENIED);
+        verify(stageHistoryRepository, never()).findByTenantIdAndOpportunityIdOrderByChangedAtAscIdAsc(TENANT_ID, OPPORTUNITY_ID);
     }
 
     @Test

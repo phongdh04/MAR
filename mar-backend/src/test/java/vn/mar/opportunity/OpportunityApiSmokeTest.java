@@ -267,13 +267,61 @@ class OpportunityApiSmokeTest {
     }
 
     @Test
+    void getStageHistory_whenLeadViewPermission_shouldReturnTimelineEnvelope() throws Exception {
+        UUID historyId = UUID.fromString("99999999-9999-9999-9999-999999999999");
+        when(permissionProfileRepository.findActivePermissionCodes(TENANT_ID, "ADMIN"))
+                .thenReturn(Set.of("lead.view"));
+        when(admissionOpportunityRepository.findByIdAndTenantId(OPPORTUNITY_ID, TENANT_ID))
+                .thenReturn(Optional.of(opportunity()));
+        when(stageHistoryRepository.findByTenantIdAndOpportunityIdOrderByChangedAtAscIdAsc(TENANT_ID, OPPORTUNITY_ID))
+                .thenReturn(List.of(StageHistory.create(
+                        historyId,
+                        TENANT_ID,
+                        OPPORTUNITY_ID,
+                        OpportunityStage.NEW,
+                        OpportunityStage.CONTACTING,
+                        ACTOR_ID,
+                        "USER",
+                        NOW,
+                        "Advisor started handling",
+                        0L
+                )));
+
+        mockMvc.perform(get("/api/v1/opportunities/{opportunityId}/stage-history", OPPORTUNITY_ID)
+                        .header(RequestIdFilter.HEADER_NAME, "req_opp_006")
+                        .header(HttpHeaders.AUTHORIZATION, bearerToken()))
+                .andExpect(status().isOk())
+                .andExpect(header().string(RequestIdFilter.HEADER_NAME, "req_opp_006"))
+                .andExpect(jsonPath("$.data[0].stage_history_id").value(historyId.toString()))
+                .andExpect(jsonPath("$.data[0].from_stage").value("NEW"))
+                .andExpect(jsonPath("$.data[0].to_stage").value("CONTACTING"))
+                .andExpect(jsonPath("$.data[0].changed_by").value(ACTOR_ID.toString()))
+                .andExpect(jsonPath("$.data[0].changed_by_type").value("USER"))
+                .andExpect(jsonPath("$.data[0].duration_in_previous_stage_seconds").value(0))
+                .andExpect(jsonPath("$.meta.request_id").value("req_opp_006"));
+    }
+
+    @Test
+    void getStageHistory_whenPermissionMissing_shouldReturnForbiddenEnvelope() throws Exception {
+        when(permissionProfileRepository.findActivePermissionCodes(TENANT_ID, "ADMIN"))
+                .thenReturn(Set.of("branch.view"));
+
+        mockMvc.perform(get("/api/v1/opportunities/{opportunityId}/stage-history", OPPORTUNITY_ID)
+                        .header(RequestIdFilter.HEADER_NAME, "req_opp_007")
+                        .header(HttpHeaders.AUTHORIZATION, bearerToken()))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.error.code").value("PERMISSION_DENIED"))
+                .andExpect(jsonPath("$.meta.request_id").value("req_opp_007"));
+    }
+
+    @Test
     void searchOpportunities_whenUnauthenticated_shouldReturnUnauthorizedEnvelope() throws Exception {
         mockMvc.perform(get("/api/v1/opportunities")
-                        .header(RequestIdFilter.HEADER_NAME, "req_opp_006"))
+                        .header(RequestIdFilter.HEADER_NAME, "req_opp_008"))
                 .andExpect(status().isUnauthorized())
-                .andExpect(header().string(RequestIdFilter.HEADER_NAME, "req_opp_006"))
+                .andExpect(header().string(RequestIdFilter.HEADER_NAME, "req_opp_008"))
                 .andExpect(jsonPath("$.error.code").value("UNAUTHENTICATED"))
-                .andExpect(jsonPath("$.meta.request_id").value("req_opp_006"));
+                .andExpect(jsonPath("$.meta.request_id").value("req_opp_008"));
     }
 
     private String bearerToken() {

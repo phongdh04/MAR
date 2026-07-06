@@ -4,11 +4,14 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import org.springframework.stereotype.Component;
 import vn.mar.opportunity.api.AdmissionOpportunitySnapshot;
+import vn.mar.opportunity.api.OpportunityActivitySnapshot;
 import vn.mar.opportunity.api.StageChangeSnapshot;
 import vn.mar.opportunity.api.StageHistorySnapshot;
+import vn.mar.opportunity.dto.response.OpportunityActivityResponse;
 import vn.mar.opportunity.dto.response.OpportunityResponse;
 import vn.mar.opportunity.dto.response.StageChangeResponse;
 import vn.mar.opportunity.dto.response.StageHistoryResponse;
+import vn.mar.opportunity.entity.Activity;
 import vn.mar.opportunity.entity.AdmissionOpportunity;
 import vn.mar.opportunity.entity.StageHistory;
 
@@ -94,6 +97,44 @@ public class AdmissionOpportunityMapper {
                 snapshot.changedAt(),
                 snapshot.reason(),
                 snapshot.durationInPreviousStageSeconds()
+        );
+    }
+
+    public OpportunityActivitySnapshot toSnapshot(Activity activity) {
+        return new OpportunityActivitySnapshot(
+                activity.id(),
+                activity.opportunityId(),
+                activity.customerId(),
+                activity.actorId(),
+                activity.actorType().name(),
+                activity.activityType().name(),
+                activity.activityResult() == null ? null : activity.activityResult().name(),
+                activity.occurredAt(),
+                activity.note(),
+                activity.nextActionAt(),
+                activity.source().name(),
+                activity.firstResponseCandidate(),
+                activity.contactSuccess(),
+                activity.createdAt()
+        );
+    }
+
+    public OpportunityActivityResponse toResponse(OpportunityActivitySnapshot snapshot) {
+        return new OpportunityActivityResponse(
+                snapshot.activityId(),
+                snapshot.opportunityId(),
+                snapshot.customerId(),
+                snapshot.actorId(),
+                snapshot.actorType(),
+                snapshot.activityType(),
+                snapshot.activityResult(),
+                snapshot.occurredAt(),
+                snapshot.note(),
+                snapshot.nextActionAt(),
+                snapshot.source(),
+                snapshot.firstResponseCandidate(),
+                snapshot.contactSuccess(),
+                snapshot.createdAt()
         );
     }
 

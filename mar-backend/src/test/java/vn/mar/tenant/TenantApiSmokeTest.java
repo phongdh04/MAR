@@ -44,6 +44,7 @@ import vn.mar.customer.repository.MergeHistoryRepository;
 import vn.mar.lead.repository.LeadRepository;
 import vn.mar.leadimport.repository.ImportBatchRepository;
 import vn.mar.leadimport.repository.ImportRowRepository;
+import vn.mar.opportunity.repository.ActivityRepository;
 import vn.mar.opportunity.repository.AdmissionOpportunityRepository;
 import vn.mar.opportunity.repository.StageHistoryRepository;
 import vn.mar.opportunity.repository.TouchpointRepository;
@@ -115,6 +116,9 @@ class TenantApiSmokeTest {
 
     @MockitoBean
     private StageHistoryRepository stageHistoryRepository;
+
+    @MockitoBean
+    private ActivityRepository activityRepository;
 
     @MockitoBean
     private TouchpointRepository touchpointRepository;

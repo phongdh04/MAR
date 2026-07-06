@@ -53,6 +53,7 @@ import vn.mar.leadimport.model.ImportSourceType;
 import vn.mar.leadimport.model.ImportType;
 import vn.mar.leadimport.repository.ImportBatchRepository;
 import vn.mar.leadimport.repository.ImportRowRepository;
+import vn.mar.opportunity.repository.ActivityRepository;
 import vn.mar.opportunity.repository.AdmissionOpportunityRepository;
 import vn.mar.opportunity.repository.StageHistoryRepository;
 import vn.mar.opportunity.repository.TouchpointRepository;
@@ -129,6 +130,9 @@ class LeadImportApiSmokeTest {
 
     @MockitoBean
     private StageHistoryRepository stageHistoryRepository;
+
+    @MockitoBean
+    private ActivityRepository activityRepository;
 
     @MockitoBean
     private TouchpointRepository touchpointRepository;

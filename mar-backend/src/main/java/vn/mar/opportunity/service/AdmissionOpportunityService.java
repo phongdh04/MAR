@@ -49,17 +49,26 @@ import vn.mar.opportunity.api.AdmissionOpportunitySearchCommand;
 import vn.mar.opportunity.api.AdmissionOpportunitySnapshot;
 import vn.mar.opportunity.api.ChangeOpportunityStageCommand;
 import vn.mar.opportunity.api.CreateAdmissionOpportunityCommand;
+import vn.mar.opportunity.api.CreateOpportunityActivityCommand;
+import vn.mar.opportunity.api.OpportunityActivitySearchCommand;
+import vn.mar.opportunity.api.OpportunityActivitySnapshot;
 import vn.mar.opportunity.api.StageChangeSnapshot;
 import vn.mar.opportunity.api.StageHistorySnapshot;
 import vn.mar.opportunity.api.UpdateAdmissionOpportunityCommand;
+import vn.mar.opportunity.entity.Activity;
 import vn.mar.opportunity.entity.AdmissionOpportunity;
 import vn.mar.opportunity.entity.StageHistory;
 import vn.mar.opportunity.entity.Touchpoint;
 import vn.mar.opportunity.mapper.AdmissionOpportunityMapper;
+import vn.mar.opportunity.model.ActivityActorType;
+import vn.mar.opportunity.model.ActivityResult;
+import vn.mar.opportunity.model.ActivitySource;
+import vn.mar.opportunity.model.ActivityType;
 import vn.mar.opportunity.model.LostReason;
 import vn.mar.opportunity.model.OpportunityStage;
 import vn.mar.opportunity.model.QualificationStatus;
 import vn.mar.opportunity.model.TouchpointType;
+import vn.mar.opportunity.repository.ActivityRepository;
 import vn.mar.opportunity.repository.AdmissionOpportunityRepository;
 import vn.mar.opportunity.repository.StageHistoryRepository;
 import vn.mar.opportunity.repository.TouchpointRepository;
@@ -110,6 +119,7 @@ public class AdmissionOpportunityService implements AdmissionOpportunityManageme
     private final AdmissionOpportunityRepository admissionOpportunityRepository;
     private final TouchpointRepository touchpointRepository;
     private final StageHistoryRepository stageHistoryRepository;
+    private final ActivityRepository activityRepository;
     private final LeadRepository leadRepository;
     private final CustomerProfileRepository customerProfileRepository;
     private final LanguageRepository languageRepository;
@@ -126,6 +136,7 @@ public class AdmissionOpportunityService implements AdmissionOpportunityManageme
             AdmissionOpportunityRepository admissionOpportunityRepository,
             TouchpointRepository touchpointRepository,
             StageHistoryRepository stageHistoryRepository,
+            ActivityRepository activityRepository,
             LeadRepository leadRepository,
             CustomerProfileRepository customerProfileRepository,
             LanguageRepository languageRepository,
@@ -140,6 +151,7 @@ public class AdmissionOpportunityService implements AdmissionOpportunityManageme
         this.admissionOpportunityRepository = admissionOpportunityRepository;
         this.touchpointRepository = touchpointRepository;
         this.stageHistoryRepository = stageHistoryRepository;
+        this.activityRepository = activityRepository;
         this.leadRepository = leadRepository;
         this.customerProfileRepository = customerProfileRepository;
         this.languageRepository = languageRepository;
@@ -253,6 +265,62 @@ public class AdmissionOpportunityService implements AdmissionOpportunityManageme
                 .stream()
                 .map(admissionOpportunityMapper::toSnapshot)
                 .toList();
+    }
+
+    @Override
+    @Transactional
+    public OpportunityActivitySnapshot createActivity(CreateOpportunityActivityCommand command) {
+        validateCreateActivityCommand(command);
+        CurrentUser actor = currentUserContext.currentUser();
+        assertPermission(actor, PermissionCodes.ACTIVITY_CREATE, "ACTIVITY_CREATE_DENIED", "Permission is required to create opportunity activities");
+        UUID tenantId = requireTenantContext(actor);
+        AdmissionOpportunity opportunity = findOpportunity(tenantId, command.opportunityId());
+        assertOpportunityVisibleToActor(actor, opportunity);
+
+        ActivityType activityType = resolveActivityType(command.activityType());
+        ActivityResult activityResult = resolveActivityResult(activityType, command.activityResult());
+        ActivitySource source = resolveActivitySource(command.source());
+        validateActivityTiming(command.occurredAt(), command.nextActionAt());
+
+        Activity activity = Activity.create(
+                UUID.randomUUID(),
+                tenantId,
+                opportunity.customerId(),
+                opportunity.id(),
+                actor.actorId(),
+                actor.actorId() == null ? ActivityActorType.SYSTEM : ActivityActorType.USER,
+                activityType,
+                activityResult,
+                command.occurredAt(),
+                normalizeOptional(command.note()),
+                command.nextActionAt(),
+                source,
+                timeProvider.now()
+        );
+        Activity savedActivity = activityRepository.save(activity);
+        auditActivityCreated(savedActivity, actor);
+        return admissionOpportunityMapper.toSnapshot(savedActivity);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public PageResponse<OpportunityActivitySnapshot> searchActivities(OpportunityActivitySearchCommand command) {
+        if (command == null) {
+            throw validation("command", "REQUIRED", "Opportunity activity search command is required");
+        }
+        CurrentUser actor = currentUserContext.currentUser();
+        assertPermission(actor, PermissionCodes.ACTIVITY_VIEW, "ACTIVITY_VIEW_DENIED", "Permission is required to view opportunity activities");
+        UUID tenantId = requireTenantContext(actor);
+        AdmissionOpportunity opportunity = findOpportunity(tenantId, command.opportunityId());
+        assertOpportunityVisibleToActor(actor, opportunity);
+        Page<OpportunityActivitySnapshot> activities = activityRepository
+                .findByTenantIdAndOpportunityIdOrderByOccurredAtDescIdDesc(
+                        tenantId,
+                        opportunity.id(),
+                        PageRequest.of(resolvePage(command.page()), resolveSize(command.size()))
+                )
+                .map(admissionOpportunityMapper::toSnapshot);
+        return PageResponse.from(activities);
     }
 
     @Override
@@ -421,6 +489,22 @@ public class AdmissionOpportunityService implements AdmissionOpportunityManageme
         requireId(command.opportunityId(), "opportunity_id", "Opportunity id is required");
         if (!StringUtils.hasText(command.toStage())) {
             throw validation("to_stage", "REQUIRED", "Target stage is required");
+        }
+    }
+
+    private void validateCreateActivityCommand(CreateOpportunityActivityCommand command) {
+        if (command == null) {
+            throw validation("command", "REQUIRED", "Opportunity activity command is required");
+        }
+        requireId(command.opportunityId(), "opportunity_id", "Opportunity id is required");
+        if (!StringUtils.hasText(command.activityType())) {
+            throw validation("activity_type", "REQUIRED", "Activity type is required");
+        }
+        if (command.occurredAt() == null) {
+            throw validation("occurred_at", "REQUIRED", "Activity occurred time is required");
+        }
+        if (!StringUtils.hasText(command.source())) {
+            throw validation("source", "REQUIRED", "Activity source is required");
         }
     }
 
@@ -634,6 +718,42 @@ public class AdmissionOpportunityService implements AdmissionOpportunityManageme
             case META_LEAD_ADS -> TouchpointType.META;
             case MANUAL, OTHER -> TouchpointType.MANUAL;
         };
+    }
+
+    private ActivityType resolveActivityType(String requestedType) {
+        try {
+            return ActivityType.valueOf(normalizeEnum(requestedType));
+        } catch (IllegalArgumentException exception) {
+            throw validation("activity_type", "INVALID_ACTIVITY_TYPE", "Activity type is invalid");
+        }
+    }
+
+    private ActivityResult resolveActivityResult(ActivityType activityType, String requestedResult) {
+        if (!StringUtils.hasText(requestedResult)) {
+            if (activityType.requiresResult()) {
+                throw validation("activity_result", "REQUIRED", "Activity result is required for outbound activity");
+            }
+            return null;
+        }
+        try {
+            return ActivityResult.valueOf(normalizeEnum(requestedResult));
+        } catch (IllegalArgumentException exception) {
+            throw validation("activity_result", "INVALID_ACTIVITY_RESULT", "Activity result is invalid");
+        }
+    }
+
+    private ActivitySource resolveActivitySource(String requestedSource) {
+        try {
+            return ActivitySource.valueOf(normalizeEnum(requestedSource));
+        } catch (IllegalArgumentException exception) {
+            throw validation("source", "INVALID_ACTIVITY_SOURCE", "Activity source is invalid");
+        }
+    }
+
+    private void validateActivityTiming(Instant occurredAt, Instant nextActionAt) {
+        if (nextActionAt != null && nextActionAt.isBefore(occurredAt)) {
+            throw validation("next_action_at", "BEFORE_OCCURRED_AT", "Next action time must be after occurred time");
+        }
     }
 
     private UUID resolveSearchOwner(CurrentUser actor, UUID requestedOwnerId) {
@@ -887,6 +1007,38 @@ public class AdmissionOpportunityService implements AdmissionOpportunityManageme
                 AuditResourceTypes.TOUCHPOINT,
                 touchpoint.id(),
                 touchpoint.id().toString(),
+                null,
+                afterData,
+                auditMetadata(actor),
+                null,
+                LogContext.requestId()
+        ));
+    }
+
+    private void auditActivityCreated(Activity activity, CurrentUser actor) {
+        Map<String, Object> afterData = new LinkedHashMap<>();
+        afterData.put("activity_id", activity.id().toString());
+        afterData.put("opportunity_id", activity.opportunityId().toString());
+        afterData.put("customer_id", activity.customerId().toString());
+        afterData.put("actor_id", activity.actorId() == null ? null : activity.actorId().toString());
+        afterData.put("actor_type", activity.actorType().name());
+        afterData.put("activity_type", activity.activityType().name());
+        afterData.put("activity_result", activity.activityResult() == null ? null : activity.activityResult().name());
+        afterData.put("occurred_at", activity.occurredAt().toString());
+        afterData.put("next_action_at", activity.nextActionAt() == null ? null : activity.nextActionAt().toString());
+        afterData.put("source", activity.source().name());
+        afterData.put("first_response_candidate", activity.firstResponseCandidate());
+        afterData.put("contact_success", activity.contactSuccess());
+        afterData.put("note_present", activity.note() != null);
+        auditService.record(new AuditRecordCommand(
+                activity.tenantId(),
+                actor.actorId(),
+                actor.actorId() == null ? "SYSTEM" : "USER",
+                actor.roleCode(),
+                AuditActions.ACTIVITY_CREATED,
+                AuditResourceTypes.ACTIVITY,
+                activity.id(),
+                activity.id().toString(),
                 null,
                 afterData,
                 auditMetadata(actor),

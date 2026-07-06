@@ -3,6 +3,7 @@ package vn.mar.opportunity.controller;
 import jakarta.validation.Valid;
 import java.util.List;
 import java.util.UUID;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -19,11 +20,16 @@ import vn.mar.opportunity.api.AdmissionOpportunityManagementService;
 import vn.mar.opportunity.api.AdmissionOpportunitySearchCommand;
 import vn.mar.opportunity.api.AdmissionOpportunitySnapshot;
 import vn.mar.opportunity.api.ChangeOpportunityStageCommand;
+import vn.mar.opportunity.api.CreateOpportunityActivityCommand;
+import vn.mar.opportunity.api.OpportunityActivitySearchCommand;
+import vn.mar.opportunity.api.OpportunityActivitySnapshot;
 import vn.mar.opportunity.api.StageChangeSnapshot;
 import vn.mar.opportunity.api.StageHistorySnapshot;
 import vn.mar.opportunity.api.UpdateAdmissionOpportunityCommand;
 import vn.mar.opportunity.dto.request.ChangeOpportunityStageRequest;
+import vn.mar.opportunity.dto.request.CreateOpportunityActivityRequest;
 import vn.mar.opportunity.dto.request.UpdateOpportunityRequest;
+import vn.mar.opportunity.dto.response.OpportunityActivityResponse;
 import vn.mar.opportunity.dto.response.OpportunityResponse;
 import vn.mar.opportunity.dto.response.StageChangeResponse;
 import vn.mar.opportunity.dto.response.StageHistoryResponse;
@@ -74,6 +80,37 @@ public class AdmissionOpportunityController {
                 .toList()));
     }
 
+    @GetMapping("/{opportunityId}/activities")
+    @PreAuthorize("@authz.hasPermission(authentication, 'activity.view')")
+    public ResponseEntity<ApiResponse<PageResponse<OpportunityActivityResponse>>> searchActivities(
+            @PathVariable UUID opportunityId,
+            @RequestParam(required = false) Integer page,
+            @RequestParam(required = false) Integer size) {
+        PageResponse<OpportunityActivitySnapshot> snapshots = admissionOpportunityManagementService.searchActivities(
+                new OpportunityActivitySearchCommand(opportunityId, page, size)
+        );
+        return ResponseEntity.ok(ApiResponse.success(toActivityResponsePage(snapshots)));
+    }
+
+    @PostMapping("/{opportunityId}/activities")
+    @PreAuthorize("@authz.hasPermission(authentication, 'activity.create')")
+    public ResponseEntity<ApiResponse<OpportunityActivityResponse>> createActivity(
+            @PathVariable UUID opportunityId,
+            @Valid @RequestBody CreateOpportunityActivityRequest request) {
+        OpportunityActivitySnapshot snapshot = admissionOpportunityManagementService.createActivity(
+                new CreateOpportunityActivityCommand(
+                        opportunityId,
+                        request.activityType(),
+                        request.activityResult(),
+                        request.occurredAt(),
+                        request.note(),
+                        request.nextActionAt(),
+                        request.source()
+                )
+        );
+        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(admissionOpportunityMapper.toResponse(snapshot)));
+    }
+
     @PatchMapping("/{opportunityId}")
     @PreAuthorize("@authz.hasPermission(authentication, 'opportunity.update')")
     public ResponseEntity<ApiResponse<OpportunityResponse>> updateOpportunity(
@@ -111,6 +148,18 @@ public class AdmissionOpportunityController {
     }
 
     private PageResponse<OpportunityResponse> toResponsePage(PageResponse<AdmissionOpportunitySnapshot> snapshots) {
+        return new PageResponse<>(
+                snapshots.items().stream()
+                        .map(admissionOpportunityMapper::toResponse)
+                        .toList(),
+                snapshots.page(),
+                snapshots.size(),
+                snapshots.totalElements(),
+                snapshots.totalPages()
+        );
+    }
+
+    private PageResponse<OpportunityActivityResponse> toActivityResponsePage(PageResponse<OpportunityActivitySnapshot> snapshots) {
         return new PageResponse<>(
                 snapshots.items().stream()
                         .map(admissionOpportunityMapper::toResponse)

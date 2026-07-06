@@ -17,4 +17,8 @@ public interface AdmissionOpportunityManagementService {
     StageChangeSnapshot changeStage(ChangeOpportunityStageCommand command);
 
     List<StageHistorySnapshot> getStageHistory(UUID opportunityId);
+
+    OpportunityActivitySnapshot createActivity(CreateOpportunityActivityCommand command);
+
+    PageResponse<OpportunityActivitySnapshot> searchActivities(OpportunityActivitySearchCommand command);
 }

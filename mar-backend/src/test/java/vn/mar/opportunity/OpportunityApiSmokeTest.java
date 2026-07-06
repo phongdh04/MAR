@@ -45,9 +45,15 @@ import vn.mar.customer.repository.MergeHistoryRepository;
 import vn.mar.lead.repository.LeadRepository;
 import vn.mar.leadimport.repository.ImportBatchRepository;
 import vn.mar.leadimport.repository.ImportRowRepository;
+import vn.mar.opportunity.entity.Activity;
 import vn.mar.opportunity.entity.AdmissionOpportunity;
 import vn.mar.opportunity.entity.StageHistory;
+import vn.mar.opportunity.model.ActivityActorType;
+import vn.mar.opportunity.model.ActivityResult;
+import vn.mar.opportunity.model.ActivitySource;
+import vn.mar.opportunity.model.ActivityType;
 import vn.mar.opportunity.model.OpportunityStage;
+import vn.mar.opportunity.repository.ActivityRepository;
 import vn.mar.opportunity.repository.AdmissionOpportunityRepository;
 import vn.mar.opportunity.repository.StageHistoryRepository;
 import vn.mar.opportunity.repository.TouchpointRepository;
@@ -129,6 +135,9 @@ class OpportunityApiSmokeTest {
     private StageHistoryRepository stageHistoryRepository;
 
     @MockitoBean
+    private ActivityRepository activityRepository;
+
+    @MockitoBean
     private TouchpointRepository touchpointRepository;
 
     @MockitoBean
@@ -145,6 +154,7 @@ class OpportunityApiSmokeTest {
         cacheEvictionService.clearPermissionProfiles();
         when(admissionOpportunityRepository.save(any(AdmissionOpportunity.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(stageHistoryRepository.save(any(StageHistory.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(activityRepository.save(any(Activity.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(auditEventRepository.save(any(AuditEvent.class))).thenAnswer(invocation -> invocation.getArgument(0));
     }
 
@@ -302,30 +312,142 @@ class OpportunityApiSmokeTest {
     }
 
     @Test
+    void createActivity_whenActivityCreatePermission_shouldReturnCreatedEnvelope() throws Exception {
+        when(permissionProfileRepository.findActivePermissionCodes(TENANT_ID, "ADMIN"))
+                .thenReturn(Set.of("activity.create"));
+        when(admissionOpportunityRepository.findByIdAndTenantId(OPPORTUNITY_ID, TENANT_ID))
+                .thenReturn(Optional.of(opportunity()));
+
+        mockMvc.perform(post("/api/v1/opportunities/{opportunityId}/activities", OPPORTUNITY_ID)
+                        .header(RequestIdFilter.HEADER_NAME, "req_opp_007")
+                        .header(HttpHeaders.AUTHORIZATION, bearerToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "activity_type": "CALL",
+                                  "activity_result": "CONNECTED",
+                                  "occurred_at": "2026-07-06T08:10:00+07:00",
+                                  "note": "Customer answered first call",
+                                  "next_action_at": "2026-07-06T09:10:00+07:00",
+                                  "source": "MANUAL"
+                                }
+                                """))
+                .andExpect(status().isCreated())
+                .andExpect(header().string(RequestIdFilter.HEADER_NAME, "req_opp_007"))
+                .andExpect(jsonPath("$.data.activity_id").exists())
+                .andExpect(jsonPath("$.data.opportunity_id").value(OPPORTUNITY_ID.toString()))
+                .andExpect(jsonPath("$.data.customer_id").value(CUSTOMER_ID.toString()))
+                .andExpect(jsonPath("$.data.actor_id").value(ACTOR_ID.toString()))
+                .andExpect(jsonPath("$.data.actor_type").value("USER"))
+                .andExpect(jsonPath("$.data.activity_type").value("CALL"))
+                .andExpect(jsonPath("$.data.activity_result").value("CONNECTED"))
+                .andExpect(jsonPath("$.data.source").value("MANUAL"))
+                .andExpect(jsonPath("$.data.first_response_candidate").value(true))
+                .andExpect(jsonPath("$.data.contact_success").value(true))
+                .andExpect(jsonPath("$.meta.request_id").value("req_opp_007"));
+    }
+
+    @Test
+    void searchActivities_whenActivityViewPermission_shouldReturnPaginatedEnvelope() throws Exception {
+        UUID activityId = UUID.fromString("abababab-abab-abab-abab-abababababab");
+        when(permissionProfileRepository.findActivePermissionCodes(TENANT_ID, "ADMIN"))
+                .thenReturn(Set.of("activity.view"));
+        when(admissionOpportunityRepository.findByIdAndTenantId(OPPORTUNITY_ID, TENANT_ID))
+                .thenReturn(Optional.of(opportunity()));
+        when(activityRepository.findByTenantIdAndOpportunityIdOrderByOccurredAtDescIdDesc(
+                eq(TENANT_ID),
+                eq(OPPORTUNITY_ID),
+                any(Pageable.class)
+        )).thenReturn(new PageImpl<>(List.of(activity(
+                activityId,
+                ActivityType.ZALO,
+                ActivityResult.REPLIED,
+                NOW.plusSeconds(90)
+        )), PageRequest.of(0, 20), 1));
+
+        mockMvc.perform(get("/api/v1/opportunities/{opportunityId}/activities", OPPORTUNITY_ID)
+                        .queryParam("page", "0")
+                        .queryParam("size", "20")
+                        .header(RequestIdFilter.HEADER_NAME, "req_opp_008")
+                        .header(HttpHeaders.AUTHORIZATION, bearerToken()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.items[0].activity_id").value(activityId.toString()))
+                .andExpect(jsonPath("$.data.items[0].activity_type").value("ZALO"))
+                .andExpect(jsonPath("$.data.items[0].activity_result").value("REPLIED"))
+                .andExpect(jsonPath("$.data.items[0].contact_success").value(true))
+                .andExpect(jsonPath("$.data.total_elements").value(1))
+                .andExpect(jsonPath("$.meta.request_id").value("req_opp_008"));
+    }
+
+    @Test
+    void createActivity_whenPermissionMissing_shouldReturnForbiddenEnvelope() throws Exception {
+        when(permissionProfileRepository.findActivePermissionCodes(TENANT_ID, "ADMIN"))
+                .thenReturn(Set.of("activity.view"));
+
+        mockMvc.perform(post("/api/v1/opportunities/{opportunityId}/activities", OPPORTUNITY_ID)
+                        .header(RequestIdFilter.HEADER_NAME, "req_opp_009")
+                        .header(HttpHeaders.AUTHORIZATION, bearerToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "activity_type": "CALL",
+                                  "activity_result": "NO_ANSWER",
+                                  "occurred_at": "2026-07-06T08:10:00+07:00",
+                                  "source": "MANUAL"
+                                }
+                                """))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.error.code").value("PERMISSION_DENIED"))
+                .andExpect(jsonPath("$.meta.request_id").value("req_opp_009"));
+    }
+
+    @Test
     void getStageHistory_whenPermissionMissing_shouldReturnForbiddenEnvelope() throws Exception {
         when(permissionProfileRepository.findActivePermissionCodes(TENANT_ID, "ADMIN"))
                 .thenReturn(Set.of("branch.view"));
 
         mockMvc.perform(get("/api/v1/opportunities/{opportunityId}/stage-history", OPPORTUNITY_ID)
-                        .header(RequestIdFilter.HEADER_NAME, "req_opp_007")
+                        .header(RequestIdFilter.HEADER_NAME, "req_opp_010")
                         .header(HttpHeaders.AUTHORIZATION, bearerToken()))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.error.code").value("PERMISSION_DENIED"))
-                .andExpect(jsonPath("$.meta.request_id").value("req_opp_007"));
+                .andExpect(jsonPath("$.meta.request_id").value("req_opp_010"));
     }
 
     @Test
     void searchOpportunities_whenUnauthenticated_shouldReturnUnauthorizedEnvelope() throws Exception {
         mockMvc.perform(get("/api/v1/opportunities")
-                        .header(RequestIdFilter.HEADER_NAME, "req_opp_008"))
+                        .header(RequestIdFilter.HEADER_NAME, "req_opp_011"))
                 .andExpect(status().isUnauthorized())
-                .andExpect(header().string(RequestIdFilter.HEADER_NAME, "req_opp_008"))
+                .andExpect(header().string(RequestIdFilter.HEADER_NAME, "req_opp_011"))
                 .andExpect(jsonPath("$.error.code").value("UNAUTHENTICATED"))
-                .andExpect(jsonPath("$.meta.request_id").value("req_opp_008"));
+                .andExpect(jsonPath("$.meta.request_id").value("req_opp_011"));
     }
 
     private String bearerToken() {
         return "Bearer " + jwtTokenProvider.createAccessToken(ACTOR_ID, TENANT_ID, "ADMIN").token();
+    }
+
+    private Activity activity(
+            UUID activityId,
+            ActivityType activityType,
+            ActivityResult activityResult,
+            Instant occurredAt) {
+        return Activity.create(
+                activityId,
+                TENANT_ID,
+                CUSTOMER_ID,
+                OPPORTUNITY_ID,
+                ACTOR_ID,
+                ActivityActorType.USER,
+                activityType,
+                activityResult,
+                occurredAt,
+                "Activity fixture",
+                null,
+                ActivitySource.MANUAL,
+                NOW
+        );
     }
 
     private AdmissionOpportunity opportunity() {

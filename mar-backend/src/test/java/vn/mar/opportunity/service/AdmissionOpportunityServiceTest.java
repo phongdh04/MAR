@@ -17,6 +17,8 @@ import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -34,6 +36,7 @@ import vn.mar.catalog.repository.LanguageRepository;
 import vn.mar.catalog.repository.ProgramRepository;
 import vn.mar.common.error.ErrorCode;
 import vn.mar.common.exception.BusinessException;
+import vn.mar.common.exception.ValidationException;
 import vn.mar.common.time.TimeProvider;
 import vn.mar.customer.entity.CustomerProfile;
 import vn.mar.customer.repository.CustomerProfileRepository;
@@ -46,14 +49,23 @@ import vn.mar.opportunity.api.AdmissionOpportunitySnapshot;
 import vn.mar.opportunity.api.ChangeOpportunityStageCommand;
 import vn.mar.opportunity.api.StageChangeSnapshot;
 import vn.mar.opportunity.api.CreateAdmissionOpportunityCommand;
+import vn.mar.opportunity.api.CreateOpportunityActivityCommand;
+import vn.mar.opportunity.api.OpportunityActivitySearchCommand;
+import vn.mar.opportunity.api.OpportunityActivitySnapshot;
 import vn.mar.opportunity.api.StageHistorySnapshot;
+import vn.mar.opportunity.entity.Activity;
 import vn.mar.opportunity.entity.AdmissionOpportunity;
 import vn.mar.opportunity.entity.StageHistory;
 import vn.mar.opportunity.entity.Touchpoint;
 import vn.mar.opportunity.mapper.AdmissionOpportunityMapper;
+import vn.mar.opportunity.model.ActivityActorType;
+import vn.mar.opportunity.model.ActivityResult;
+import vn.mar.opportunity.model.ActivitySource;
+import vn.mar.opportunity.model.ActivityType;
 import vn.mar.opportunity.model.LostReason;
 import vn.mar.opportunity.model.OpportunityStage;
 import vn.mar.opportunity.model.TouchpointType;
+import vn.mar.opportunity.repository.ActivityRepository;
 import vn.mar.opportunity.repository.AdmissionOpportunityRepository;
 import vn.mar.opportunity.repository.StageHistoryRepository;
 import vn.mar.opportunity.repository.TouchpointRepository;
@@ -87,6 +99,9 @@ class AdmissionOpportunityServiceTest {
 
     @Mock
     private StageHistoryRepository stageHistoryRepository;
+
+    @Mock
+    private ActivityRepository activityRepository;
 
     @Mock
     private LeadRepository leadRepository;
@@ -124,6 +139,7 @@ class AdmissionOpportunityServiceTest {
                 admissionOpportunityRepository,
                 touchpointRepository,
                 stageHistoryRepository,
+                activityRepository,
                 leadRepository,
                 customerProfileRepository,
                 languageRepository,
@@ -308,6 +324,116 @@ class AdmissionOpportunityServiceTest {
                 .extracting("errorCode")
                 .isEqualTo(ErrorCode.PERMISSION_DENIED);
         verify(stageHistoryRepository, never()).findByTenantIdAndOpportunityIdOrderByChangedAtAscIdAsc(TENANT_ID, OPPORTUNITY_ID);
+    }
+
+    @Test
+    void createActivity_whenConnectedCall_shouldPersistActivityReturnSlaFlagsAndAuditWithoutNoteContent() {
+        allowAdmin("activity.create");
+        when(admissionOpportunityRepository.findByIdAndTenantId(OPPORTUNITY_ID, TENANT_ID))
+                .thenReturn(Optional.of(opportunity(OPPORTUNITY_ID, LEAD_ID, ACTOR_ID)));
+        when(activityRepository.save(any(Activity.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        OpportunityActivitySnapshot snapshot = admissionOpportunityService.createActivity(new CreateOpportunityActivityCommand(
+                OPPORTUNITY_ID,
+                "CALL",
+                "CONNECTED",
+                NOW.plusSeconds(30),
+                "Customer shared private budget context",
+                NOW.plusSeconds(3600),
+                "MANUAL"
+        ));
+
+        assertThat(snapshot.activityId()).isNotNull();
+        assertThat(snapshot.activityType()).isEqualTo("CALL");
+        assertThat(snapshot.activityResult()).isEqualTo("CONNECTED");
+        assertThat(snapshot.firstResponseCandidate()).isTrue();
+        assertThat(snapshot.contactSuccess()).isTrue();
+        ArgumentCaptor<Activity> activityCaptor = ArgumentCaptor.forClass(Activity.class);
+        verify(activityRepository).save(activityCaptor.capture());
+        assertThat(activityCaptor.getValue().customerId()).isEqualTo(CUSTOMER_ID);
+        assertThat(activityCaptor.getValue().actorType()).isEqualTo(ActivityActorType.USER);
+        ArgumentCaptor<AuditRecordCommand> auditCaptor = ArgumentCaptor.forClass(AuditRecordCommand.class);
+        verify(auditService).record(auditCaptor.capture());
+        assertThat(auditCaptor.getValue().action()).isEqualTo(AuditActions.ACTIVITY_CREATED);
+        assertThat(auditCaptor.getValue().afterData())
+                .containsEntry("note_present", true)
+                .doesNotContainValue("Customer shared private budget context");
+    }
+
+    @Test
+    void searchActivities_whenActivityViewPermission_shouldReturnPaginatedTimeline() {
+        allowAdmin("activity.view");
+        when(admissionOpportunityRepository.findByIdAndTenantId(OPPORTUNITY_ID, TENANT_ID))
+                .thenReturn(Optional.of(opportunity(OPPORTUNITY_ID, LEAD_ID, ACTOR_ID)));
+        Activity activity = activity(
+                UUID.fromString("99999999-9999-9999-9999-999999999999"),
+                ActivityType.ZALO,
+                ActivityResult.REPLIED,
+                NOW.plusSeconds(120)
+        );
+        when(activityRepository.findByTenantIdAndOpportunityIdOrderByOccurredAtDescIdDesc(
+                eq(TENANT_ID),
+                eq(OPPORTUNITY_ID),
+                any(PageRequest.class)
+        )).thenReturn(new PageImpl<>(List.of(activity), PageRequest.of(0, 20), 1));
+
+        var response = admissionOpportunityService.searchActivities(new OpportunityActivitySearchCommand(
+                OPPORTUNITY_ID,
+                0,
+                20
+        ));
+
+        assertThat(response.totalElements()).isEqualTo(1);
+        assertThat(response.items().getFirst().activityType()).isEqualTo("ZALO");
+        assertThat(response.items().getFirst().contactSuccess()).isTrue();
+    }
+
+    @Test
+    void createActivity_whenAdvisorCreatesForOtherOwnerOpportunity_shouldRejectBeforeSave() {
+        when(currentUserContext.currentUser()).thenReturn(new CurrentUser(
+                OWNER_ID,
+                TENANT_ID,
+                "ADVISOR",
+                Set.of("activity.create"),
+                "req_opp_unit_001"
+        ));
+        when(admissionOpportunityRepository.findByIdAndTenantId(OPPORTUNITY_ID, TENANT_ID))
+                .thenReturn(Optional.of(opportunity(OPPORTUNITY_ID, LEAD_ID, OTHER_OWNER_ID)));
+
+        assertThatThrownBy(() -> admissionOpportunityService.createActivity(new CreateOpportunityActivityCommand(
+                OPPORTUNITY_ID,
+                "CALL",
+                "NO_ANSWER",
+                NOW,
+                null,
+                null,
+                "MANUAL"
+        )))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.PERMISSION_DENIED);
+        verify(activityRepository, never()).save(any(Activity.class));
+    }
+
+    @Test
+    void createActivity_whenOutboundResultMissing_shouldReject() {
+        allowAdmin("activity.create");
+        when(admissionOpportunityRepository.findByIdAndTenantId(OPPORTUNITY_ID, TENANT_ID))
+                .thenReturn(Optional.of(opportunity(OPPORTUNITY_ID, LEAD_ID, ACTOR_ID)));
+
+        assertThatThrownBy(() -> admissionOpportunityService.createActivity(new CreateOpportunityActivityCommand(
+                OPPORTUNITY_ID,
+                "SMS",
+                null,
+                NOW,
+                null,
+                null,
+                "MANUAL"
+        )))
+                .isInstanceOf(ValidationException.class)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.VALIDATION_ERROR);
+        verify(activityRepository, never()).save(any(Activity.class));
     }
 
     @Test
@@ -573,6 +699,28 @@ class AdmissionOpportunityServiceTest {
                 ACTOR_ID,
                 NOW,
                 ACTOR_ID
+        );
+    }
+
+    private Activity activity(
+            UUID activityId,
+            ActivityType activityType,
+            ActivityResult activityResult,
+            Instant occurredAt) {
+        return Activity.create(
+                activityId,
+                TENANT_ID,
+                CUSTOMER_ID,
+                OPPORTUNITY_ID,
+                ACTOR_ID,
+                ActivityActorType.USER,
+                activityType,
+                activityResult,
+                occurredAt,
+                "Activity fixture",
+                null,
+                ActivitySource.MANUAL,
+                NOW
         );
     }
 

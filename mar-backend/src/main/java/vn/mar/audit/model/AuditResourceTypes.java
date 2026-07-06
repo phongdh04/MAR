@@ -13,6 +13,9 @@ public final class AuditResourceTypes {
     public static final String DUPLICATE_CASE = "DUPLICATE_CASE";
     public static final String CUSTOMER_PROFILE = "CUSTOMER_PROFILE";
     public static final String MERGE_HISTORY = "MERGE_HISTORY";
+    public static final String LEAD = "LEAD";
+    public static final String ADMISSION_OPPORTUNITY = "ADMISSION_OPPORTUNITY";
+    public static final String TOUCHPOINT = "TOUCHPOINT";
 
     private AuditResourceTypes() {
     }

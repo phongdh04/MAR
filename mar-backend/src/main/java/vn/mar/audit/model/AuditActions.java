@@ -27,6 +27,10 @@ public final class AuditActions {
     public static final String DUPLICATE_CASE_RESOLVED = "DUPLICATE_CASE_RESOLVED";
     public static final String CUSTOMER_MERGED = "CUSTOMER_MERGED";
     public static final String CUSTOMER_UNMERGED = "CUSTOMER_UNMERGED";
+    public static final String OPPORTUNITY_CREATED = "OPPORTUNITY_CREATED";
+    public static final String OPPORTUNITY_LINKED_TO_EXISTING = "OPPORTUNITY_LINKED_TO_EXISTING";
+    public static final String OPPORTUNITY_UPDATED = "OPPORTUNITY_UPDATED";
+    public static final String TOUCHPOINT_CREATED = "TOUCHPOINT_CREATED";
 
     private AuditActions() {
     }

@@ -27,6 +27,7 @@ class FlywayMigrationIT {
     private static final String SLA_TASK_MANAGE_PERMISSION_CODE = "sla.task.manage";
     private static final String ASSIGNMENT_VIEW_PERMISSION_CODE = "assignment.view";
     private static final String ASSIGNMENT_MANAGE_PERMISSION_CODE = "assignment.manage";
+    private static final String INTEGRATION_LOG_VIEW_PERMISSION_CODE = "integration_log.view";
     private static final String EXISTING_TENANT_ID = "11111111-1111-1111-1111-111111111111";
 
     private static final List<String> FOUNDATION_TABLES = List.of(
@@ -146,6 +147,7 @@ class FlywayMigrationIT {
                 assertThat(rowExists(connection, "permissions", "function_code", SLA_TASK_MANAGE_PERMISSION_CODE)).isTrue();
                 assertThat(rowExists(connection, "permissions", "function_code", ASSIGNMENT_VIEW_PERMISSION_CODE)).isTrue();
                 assertThat(rowExists(connection, "permissions", "function_code", ASSIGNMENT_MANAGE_PERMISSION_CODE)).isTrue();
+                assertThat(rowExists(connection, "permissions", "function_code", INTEGRATION_LOG_VIEW_PERMISSION_CODE)).isTrue();
                 assertThat(rowExistsForTenant(connection, "working_hours_configs", EXISTING_TENANT_ID, "weekday", "MONDAY")).isTrue();
                 assertThat(rowExistsForTenant(connection, "sla_policies", EXISTING_TENANT_ID, "policy_type", "AFTER_HOURS")).isTrue();
                 assertThat(permissionProfileExists(connection, EXISTING_TENANT_ID, "ADMIN", DUPLICATE_PERMISSION_CODE, "MANAGE", "TENANT")).isTrue();
@@ -161,6 +163,8 @@ class FlywayMigrationIT {
                 assertThat(permissionProfileExists(connection, EXISTING_TENANT_ID, "SALES_LEAD", SLA_TASK_MANAGE_PERMISSION_CODE, "MANAGE", "BRANCH")).isTrue();
                 assertThat(permissionProfileExists(connection, EXISTING_TENANT_ID, "ADMIN", ASSIGNMENT_MANAGE_PERMISSION_CODE, "MANAGE", "TENANT")).isTrue();
                 assertThat(permissionProfileExists(connection, EXISTING_TENANT_ID, "SALES_LEAD", ASSIGNMENT_MANAGE_PERMISSION_CODE, "MANAGE", "BRANCH")).isTrue();
+                assertThat(permissionProfileExists(connection, EXISTING_TENANT_ID, "ADMIN", INTEGRATION_LOG_VIEW_PERMISSION_CODE, "VIEW", "TENANT")).isTrue();
+                assertThat(permissionProfileExists(connection, EXISTING_TENANT_ID, "MARKETING", INTEGRATION_LOG_VIEW_PERMISSION_CODE, "VIEW", "TENANT")).isTrue();
             }
         } finally {
             TimeZone.setDefault(originalTimeZone);

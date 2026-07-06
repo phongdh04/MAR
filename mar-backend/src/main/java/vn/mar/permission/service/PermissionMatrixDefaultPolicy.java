@@ -71,6 +71,7 @@ final class PermissionMatrixDefaultPolicy {
         grant(defaults, RoleCode.ADMIN, PermissionCodes.ACTIVITY_VIEW, PermissionAccessLevel.VIEW, PermissionScope.TENANT);
         grant(defaults, RoleCode.ADMIN, PermissionCodes.ACTIVITY_CREATE, PermissionAccessLevel.CREATE, PermissionScope.TENANT);
         grant(defaults, RoleCode.ADMIN, PermissionCodes.AUDIT_VIEW, PermissionAccessLevel.VIEW, PermissionScope.TENANT);
+        grant(defaults, RoleCode.ADMIN, PermissionCodes.INTEGRATION_LOG_VIEW, PermissionAccessLevel.VIEW, PermissionScope.TENANT);
 
         grant(defaults, RoleCode.CEO, PermissionCodes.TENANT_VIEW, PermissionAccessLevel.VIEW, PermissionScope.TENANT);
         grant(defaults, RoleCode.CEO, PermissionCodes.BRANCH_VIEW, PermissionAccessLevel.VIEW, PermissionScope.TENANT);
@@ -80,10 +81,12 @@ final class PermissionMatrixDefaultPolicy {
         grant(defaults, RoleCode.CEO, PermissionCodes.LEAD_VIEW, PermissionAccessLevel.VIEW, PermissionScope.TENANT);
         grant(defaults, RoleCode.CEO, PermissionCodes.ACTIVITY_VIEW, PermissionAccessLevel.VIEW, PermissionScope.TENANT);
         grant(defaults, RoleCode.CEO, PermissionCodes.AUDIT_VIEW, PermissionAccessLevel.VIEW, PermissionScope.TENANT);
+        grant(defaults, RoleCode.CEO, PermissionCodes.INTEGRATION_LOG_VIEW, PermissionAccessLevel.VIEW, PermissionScope.TENANT);
 
         grant(defaults, RoleCode.MARKETING, PermissionCodes.CATALOG_VIEW, PermissionAccessLevel.VIEW, PermissionScope.TENANT);
         grant(defaults, RoleCode.MARKETING, PermissionCodes.IMPORT_VIEW, PermissionAccessLevel.VIEW, PermissionScope.TENANT);
         grant(defaults, RoleCode.MARKETING, PermissionCodes.LEAD_VIEW, PermissionAccessLevel.VIEW, PermissionScope.TENANT);
+        grant(defaults, RoleCode.MARKETING, PermissionCodes.INTEGRATION_LOG_VIEW, PermissionAccessLevel.VIEW, PermissionScope.TENANT);
 
         grant(defaults, RoleCode.SALES_LEAD, PermissionCodes.BRANCH_VIEW, PermissionAccessLevel.VIEW, PermissionScope.BRANCH);
         grant(defaults, RoleCode.SALES_LEAD, PermissionCodes.USER_VIEW, PermissionAccessLevel.VIEW, PermissionScope.BRANCH);

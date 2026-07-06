@@ -30,6 +30,7 @@ public final class PermissionCodes {
     public static final String DATA_EXPORT = "data.export";
     public static final String PAYMENT_WRITE = "payment.write";
     public static final String AUDIT_VIEW = "audit.view";
+    public static final String INTEGRATION_LOG_VIEW = "integration_log.view";
 
     private PermissionCodes() {
     }

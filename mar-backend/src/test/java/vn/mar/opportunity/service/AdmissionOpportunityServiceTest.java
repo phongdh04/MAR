@@ -373,6 +373,32 @@ class AdmissionOpportunityServiceTest {
     }
 
     @Test
+    void createActivity_whenOutboundFailed_shouldPersistActivityButNotCompleteFirstResponseSla() {
+        allowAdmin("activity.create");
+        when(admissionOpportunityRepository.findByIdAndTenantId(OPPORTUNITY_ID, TENANT_ID))
+                .thenReturn(Optional.of(opportunity(OPPORTUNITY_ID, LEAD_ID, ACTOR_ID)));
+        when(activityRepository.save(any(Activity.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        OpportunityActivitySnapshot snapshot = admissionOpportunityService.createActivity(new CreateOpportunityActivityCommand(
+                OPPORTUNITY_ID,
+                "CALL",
+                "FAILED",
+                NOW.plusSeconds(45),
+                "Line unavailable",
+                null,
+                "MANUAL"
+        ));
+
+        assertThat(snapshot.activityType()).isEqualTo("CALL");
+        assertThat(snapshot.activityResult()).isEqualTo("FAILED");
+        assertThat(snapshot.firstResponseCandidate()).isFalse();
+        assertThat(snapshot.contactSuccess()).isFalse();
+        verify(activityRepository).save(any(Activity.class));
+        verify(auditService).record(any(AuditRecordCommand.class));
+        verify(slaTaskManagementService, never()).completeFirstResponseTask(any(CompleteFirstResponseSlaTaskCommand.class));
+    }
+
+    @Test
     void searchActivities_whenActivityViewPermission_shouldReturnPaginatedTimeline() {
         allowAdmin("activity.view");
         when(admissionOpportunityRepository.findByIdAndTenantId(OPPORTUNITY_ID, TENANT_ID))
@@ -477,6 +503,7 @@ class AdmissionOpportunityServiceTest {
         ArgumentCaptor<AdmissionOpportunity> opportunityCaptor = ArgumentCaptor.forClass(AdmissionOpportunity.class);
         verify(admissionOpportunityRepository).save(opportunityCaptor.capture());
         assertThat(opportunityCaptor.getValue().currentStage()).isEqualTo(OpportunityStage.CONTACTING);
+        verify(slaTaskManagementService, never()).completeFirstResponseTask(any(CompleteFirstResponseSlaTaskCommand.class));
         ArgumentCaptor<AuditRecordCommand> auditCaptor = ArgumentCaptor.forClass(AuditRecordCommand.class);
         verify(auditService).record(auditCaptor.capture());
         assertThat(auditCaptor.getValue().action()).isEqualTo(AuditActions.OPPORTUNITY_STAGE_CHANGED);
@@ -498,6 +525,9 @@ class AdmissionOpportunityServiceTest {
                 .isInstanceOf(BusinessException.class)
                 .extracting("errorCode")
                 .isEqualTo(ErrorCode.INVALID_STAGE_TRANSITION);
+        verify(stageHistoryRepository, never()).save(any(StageHistory.class));
+        verify(admissionOpportunityRepository, never()).save(any(AdmissionOpportunity.class));
+        verify(auditService, never()).record(any(AuditRecordCommand.class));
     }
 
     @Test
@@ -518,6 +548,9 @@ class AdmissionOpportunityServiceTest {
                 .isInstanceOf(BusinessException.class)
                 .extracting("errorCode")
                 .isEqualTo(ErrorCode.LOST_REASON_REQUIRED);
+        verify(stageHistoryRepository, never()).save(any(StageHistory.class));
+        verify(admissionOpportunityRepository, never()).save(any(AdmissionOpportunity.class));
+        verify(auditService, never()).record(any(AuditRecordCommand.class));
     }
 
     @Test
@@ -538,6 +571,9 @@ class AdmissionOpportunityServiceTest {
                 .isInstanceOf(BusinessException.class)
                 .extracting("errorCode")
                 .isEqualTo(ErrorCode.LOST_REASON_REQUIRED);
+        verify(stageHistoryRepository, never()).save(any(StageHistory.class));
+        verify(admissionOpportunityRepository, never()).save(any(AdmissionOpportunity.class));
+        verify(auditService, never()).record(any(AuditRecordCommand.class));
     }
 
     @Test

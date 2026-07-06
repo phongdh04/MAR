@@ -1,6 +1,7 @@
 package vn.mar.opportunity.controller;
 
 import jakarta.validation.Valid;
+import java.util.List;
 import java.util.UUID;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -19,11 +20,13 @@ import vn.mar.opportunity.api.AdmissionOpportunitySearchCommand;
 import vn.mar.opportunity.api.AdmissionOpportunitySnapshot;
 import vn.mar.opportunity.api.ChangeOpportunityStageCommand;
 import vn.mar.opportunity.api.StageChangeSnapshot;
+import vn.mar.opportunity.api.StageHistorySnapshot;
 import vn.mar.opportunity.api.UpdateAdmissionOpportunityCommand;
 import vn.mar.opportunity.dto.request.ChangeOpportunityStageRequest;
 import vn.mar.opportunity.dto.request.UpdateOpportunityRequest;
 import vn.mar.opportunity.dto.response.OpportunityResponse;
 import vn.mar.opportunity.dto.response.StageChangeResponse;
+import vn.mar.opportunity.dto.response.StageHistoryResponse;
 import vn.mar.opportunity.mapper.AdmissionOpportunityMapper;
 
 @RestController
@@ -60,6 +63,15 @@ public class AdmissionOpportunityController {
     public ResponseEntity<ApiResponse<OpportunityResponse>> getOpportunity(@PathVariable UUID opportunityId) {
         AdmissionOpportunitySnapshot snapshot = admissionOpportunityManagementService.getOpportunity(opportunityId);
         return ResponseEntity.ok(ApiResponse.success(admissionOpportunityMapper.toResponse(snapshot)));
+    }
+
+    @GetMapping("/{opportunityId}/stage-history")
+    @PreAuthorize("@authz.hasAnyPermission(authentication, 'lead.view', 'opportunity.update')")
+    public ResponseEntity<ApiResponse<List<StageHistoryResponse>>> getStageHistory(@PathVariable UUID opportunityId) {
+        List<StageHistorySnapshot> snapshots = admissionOpportunityManagementService.getStageHistory(opportunityId);
+        return ResponseEntity.ok(ApiResponse.success(snapshots.stream()
+                .map(admissionOpportunityMapper::toResponse)
+                .toList()));
     }
 
     @PatchMapping("/{opportunityId}")

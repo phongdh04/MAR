@@ -5,9 +5,12 @@ import java.util.Map;
 import org.springframework.stereotype.Component;
 import vn.mar.opportunity.api.AdmissionOpportunitySnapshot;
 import vn.mar.opportunity.api.StageChangeSnapshot;
+import vn.mar.opportunity.api.StageHistorySnapshot;
 import vn.mar.opportunity.dto.response.OpportunityResponse;
 import vn.mar.opportunity.dto.response.StageChangeResponse;
+import vn.mar.opportunity.dto.response.StageHistoryResponse;
 import vn.mar.opportunity.entity.AdmissionOpportunity;
+import vn.mar.opportunity.entity.StageHistory;
 
 @Component
 public class AdmissionOpportunityMapper {
@@ -65,6 +68,32 @@ public class AdmissionOpportunityMapper {
                 snapshot.toStage(),
                 snapshot.stageHistoryId(),
                 snapshot.changedAt()
+        );
+    }
+
+    public StageHistorySnapshot toSnapshot(StageHistory history) {
+        return new StageHistorySnapshot(
+                history.id(),
+                history.fromStage() == null ? null : history.fromStage().name(),
+                history.toStage().name(),
+                history.changedBy(),
+                history.changedByType(),
+                history.changedAt(),
+                history.reason(),
+                history.durationInPreviousStageSeconds()
+        );
+    }
+
+    public StageHistoryResponse toResponse(StageHistorySnapshot snapshot) {
+        return new StageHistoryResponse(
+                snapshot.stageHistoryId(),
+                snapshot.fromStage(),
+                snapshot.toStage(),
+                snapshot.changedBy(),
+                snapshot.changedByType(),
+                snapshot.changedAt(),
+                snapshot.reason(),
+                snapshot.durationInPreviousStageSeconds()
         );
     }
 

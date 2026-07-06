@@ -1,5 +1,6 @@
 package vn.mar.opportunity.api;
 
+import java.util.List;
 import java.util.UUID;
 import vn.mar.common.pagination.PageResponse;
 
@@ -14,4 +15,6 @@ public interface AdmissionOpportunityManagementService {
     AdmissionOpportunitySnapshot updateOpportunity(UpdateAdmissionOpportunityCommand command);
 
     StageChangeSnapshot changeStage(ChangeOpportunityStageCommand command);
+
+    List<StageHistorySnapshot> getStageHistory(UUID opportunityId);
 }

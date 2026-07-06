@@ -50,6 +50,7 @@ import vn.mar.opportunity.api.AdmissionOpportunitySnapshot;
 import vn.mar.opportunity.api.ChangeOpportunityStageCommand;
 import vn.mar.opportunity.api.CreateAdmissionOpportunityCommand;
 import vn.mar.opportunity.api.StageChangeSnapshot;
+import vn.mar.opportunity.api.StageHistorySnapshot;
 import vn.mar.opportunity.api.UpdateAdmissionOpportunityCommand;
 import vn.mar.opportunity.entity.AdmissionOpportunity;
 import vn.mar.opportunity.entity.StageHistory;
@@ -237,6 +238,21 @@ public class AdmissionOpportunityService implements AdmissionOpportunityManageme
         AdmissionOpportunity opportunity = findOpportunity(requireTenantContext(actor), opportunityId);
         assertOpportunityVisibleToActor(actor, opportunity);
         return admissionOpportunityMapper.toSnapshot(opportunity);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<StageHistorySnapshot> getStageHistory(UUID opportunityId) {
+        CurrentUser actor = currentUserContext.currentUser();
+        assertAnyPermission(actor, List.of(PermissionCodes.LEAD_VIEW, PermissionCodes.OPPORTUNITY_UPDATE), "OPPORTUNITY_VIEW_DENIED", "Permission is required to view opportunity stage history");
+        UUID tenantId = requireTenantContext(actor);
+        AdmissionOpportunity opportunity = findOpportunity(tenantId, opportunityId);
+        assertOpportunityVisibleToActor(actor, opportunity);
+        return stageHistoryRepository
+                .findByTenantIdAndOpportunityIdOrderByChangedAtAscIdAsc(tenantId, opportunity.id())
+                .stream()
+                .map(admissionOpportunityMapper::toSnapshot)
+                .toList();
     }
 
     @Override

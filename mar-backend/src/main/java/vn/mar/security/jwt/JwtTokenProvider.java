@@ -11,6 +11,7 @@ import java.util.Date;
 import java.util.UUID;
 import javax.crypto.SecretKey;
 import org.springframework.stereotype.Component;
+import vn.mar.common.time.TimeProvider;
 
 @Component
 public class JwtTokenProvider {
@@ -20,14 +21,16 @@ public class JwtTokenProvider {
 
     private final JwtProperties properties;
     private final SecretKey secretKey;
+    private final TimeProvider timeProvider;
 
-    public JwtTokenProvider(JwtProperties properties) {
+    public JwtTokenProvider(JwtProperties properties, TimeProvider timeProvider) {
         this.properties = properties;
+        this.timeProvider = timeProvider;
         this.secretKey = Keys.hmacShaKeyFor(properties.secret().getBytes(StandardCharsets.UTF_8));
     }
 
     public JwtToken createAccessToken(UUID actorId, UUID tenantId, String roleCode) {
-        Instant issuedAt = Instant.now();
+        Instant issuedAt = timeProvider.now();
         Instant expiresAt = issuedAt.plus(properties.accessTokenExpiration());
         String token = Jwts.builder()
                 .issuer(properties.issuer())
@@ -43,6 +46,7 @@ public class JwtTokenProvider {
 
     public JwtClaims parse(String token) {
         Claims claims = Jwts.parser()
+                .clock(() -> Date.from(timeProvider.now()))
                 .verifyWith(secretKey)
                 .requireIssuer(properties.issuer())
                 .build()
@@ -59,7 +63,7 @@ public class JwtTokenProvider {
     }
 
     public long expiresInSeconds(JwtToken token) {
-        Duration remaining = Duration.between(Instant.now(), token.expiresAt());
+        Duration remaining = Duration.between(timeProvider.now(), token.expiresAt());
         return Math.max(0, remaining.toSeconds());
     }
 

@@ -16,14 +16,11 @@ import org.junit.jupiter.api.Test;
 class JwtTokenProviderTest {
 
     private static final String TEST_SECRET = "12345678901234567890123456789012";
+    private static final Instant NOW = Instant.parse("2026-07-02T00:00:00Z");
 
     @Test
     void createAndParse_whenValidClaims_shouldRoundTripIdentity() {
-        JwtTokenProvider provider = new JwtTokenProvider(new JwtProperties(
-                "mar-api",
-                TEST_SECRET,
-                Duration.ofMinutes(30)
-        ));
+        JwtTokenProvider provider = provider();
         UUID actorId = UUID.fromString("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
         UUID tenantId = UUID.fromString("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb");
 
@@ -38,11 +35,7 @@ class JwtTokenProviderTest {
 
     @Test
     void parse_whenTokenInvalid_shouldReject() {
-        JwtTokenProvider provider = new JwtTokenProvider(new JwtProperties(
-                "mar-api",
-                TEST_SECRET,
-                Duration.ofMinutes(30)
-        ));
+        JwtTokenProvider provider = provider();
 
         assertThatThrownBy(() -> provider.parse("not-a-jwt"))
                 .isInstanceOf(JwtException.class);
@@ -50,17 +43,12 @@ class JwtTokenProviderTest {
 
     @Test
     void parse_whenRequiredClaimMissing_shouldReject() {
-        JwtTokenProvider provider = new JwtTokenProvider(new JwtProperties(
-                "mar-api",
-                TEST_SECRET,
-                Duration.ofMinutes(30)
-        ));
-        Instant now = Instant.now();
+        JwtTokenProvider provider = provider();
         String token = Jwts.builder()
                 .issuer("mar-api")
                 .subject("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")
-                .issuedAt(Date.from(now))
-                .expiration(Date.from(now.plus(Duration.ofMinutes(30))))
+                .issuedAt(Date.from(NOW))
+                .expiration(Date.from(NOW.plus(Duration.ofMinutes(30))))
                 .claim("role_code", "ADMIN")
                 .signWith(Keys.hmacShaKeyFor(TEST_SECRET.getBytes(StandardCharsets.UTF_8)), Jwts.SIG.HS256)
                 .compact();
@@ -68,5 +56,12 @@ class JwtTokenProviderTest {
         assertThatThrownBy(() -> provider.parse(token))
                 .isInstanceOf(JwtException.class)
                 .hasMessageContaining("tenant_id");
+    }
+
+    private JwtTokenProvider provider() {
+        return new JwtTokenProvider(
+                new JwtProperties("mar-api", TEST_SECRET, Duration.ofMinutes(30)),
+                () -> NOW
+        );
     }
 }

@@ -23,6 +23,8 @@ public enum ErrorCode {
     UNMERGE_NOT_ALLOWED("UNMERGE_NOT_ALLOWED", HttpStatus.UNPROCESSABLE_ENTITY, "Unmerge is not allowed"),
     INVALID_STAGE_TRANSITION("INVALID_STAGE_TRANSITION", HttpStatus.CONFLICT, "Stage transition is invalid"),
     LOST_REASON_REQUIRED("LOST_REASON_REQUIRED", HttpStatus.UNPROCESSABLE_ENTITY, "Lost reason is required"),
+    WEBHOOK_TENANT_KEY_INVALID("WEBHOOK_TENANT_KEY_INVALID", HttpStatus.UNAUTHORIZED, "Webhook tenant key is invalid"),
+    WEBHOOK_SIGNATURE_INVALID("WEBHOOK_SIGNATURE_INVALID", HttpStatus.UNAUTHORIZED, "Webhook signature is invalid"),
     BUSINESS_RULE_VIOLATION("BUSINESS_RULE_VIOLATION", HttpStatus.UNPROCESSABLE_ENTITY, "Business rule violation"),
     INTERNAL_ERROR("INTERNAL_ERROR", HttpStatus.INTERNAL_SERVER_ERROR, "Internal server error");
 

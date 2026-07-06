@@ -51,3 +51,5 @@ mar:
       issuer: ${MAR_JWT_ISSUER:mar-api}
       secret: ${MAR_JWT_SECRET:change-me-local-development-secret-change-before-prod}
       access-token-expiration: ${MAR_JWT_ACCESS_TOKEN_EXPIRATION:60m}
+  webhook:
+    signature-secret: ${MAR_WEBHOOK_SIGNATURE_SECRET:change-me-local-webhook-secret-change-before-prod}

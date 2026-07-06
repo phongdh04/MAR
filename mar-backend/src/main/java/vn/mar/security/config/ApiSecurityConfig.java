@@ -56,6 +56,7 @@ public class ApiSecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/api/v1/auth/login").permitAll()
                         .requestMatchers("/api/v1/health").permitAll()
+                        .requestMatchers("/api/v1/webhooks/**").permitAll()
                         .requestMatchers("/actuator/health", "/actuator/health/**").permitAll()
                         .anyRequest().authenticated())
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
@@ -75,7 +76,14 @@ public class ApiSecurityConfig {
         CorsConfiguration config = new CorsConfiguration();
         config.setAllowedOrigins(parseCsv(allowedOrigins));
         config.setAllowedMethods(List.of("GET", "POST", "PATCH", "OPTIONS"));
-        config.setAllowedHeaders(List.of("Authorization", "Content-Type", "X-Request-Id"));
+        config.setAllowedHeaders(List.of(
+                "Authorization",
+                "Content-Type",
+                "Idempotency-Key",
+                "X-Mar-Signature",
+                "X-Mar-Tenant-Key",
+                "X-Request-Id"
+        ));
         config.setExposedHeaders(List.of("X-Request-Id"));
         config.setAllowCredentials(false);
 

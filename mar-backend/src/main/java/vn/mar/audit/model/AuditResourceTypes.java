@@ -17,6 +17,7 @@ public final class AuditResourceTypes {
     public static final String ADMISSION_OPPORTUNITY = "ADMISSION_OPPORTUNITY";
     public static final String STAGE_HISTORY = "STAGE_HISTORY";
     public static final String TOUCHPOINT = "TOUCHPOINT";
+    public static final String ACTIVITY = "ACTIVITY";
 
     private AuditResourceTypes() {
     }

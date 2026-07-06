@@ -19,6 +19,8 @@ class FlywayMigrationIT {
     private static final String DUPLICATE_PERMISSION_CODE = "duplicate.manage";
     private static final String CUSTOMER_MERGE_PERMISSION_CODE = "customer.merge";
     private static final String OPPORTUNITY_UPDATE_PERMISSION_CODE = "opportunity.update";
+    private static final String ACTIVITY_VIEW_PERMISSION_CODE = "activity.view";
+    private static final String ACTIVITY_CREATE_PERMISSION_CODE = "activity.create";
     private static final String EXISTING_TENANT_ID = "11111111-1111-1111-1111-111111111111";
 
     private static final List<String> FOUNDATION_TABLES = List.of(
@@ -41,6 +43,7 @@ class FlywayMigrationIT {
             "admission_opportunities",
             "touchpoints",
             "stage_history",
+            "activities",
             "import_batches",
             "import_rows"
     );
@@ -87,10 +90,12 @@ class FlywayMigrationIT {
                 assertThat(databaseObjectExists(connection, "ux_duplicate_cases__tenant_pair_type_open")).isTrue();
                 assertThat(databaseObjectExists(connection, "idx_merge_history__tenant_target")).isTrue();
                 assertThat(databaseObjectExists(connection, "idx_stage_history__tenant_opportunity_changed")).isTrue();
+                assertThat(databaseObjectExists(connection, "idx_activities__tenant_opportunity_occurred")).isTrue();
                 assertThat(constraintExists(connection, "courses", "ck_courses__tuition_non_negative")).isTrue();
                 assertThat(constraintExists(connection, "merge_history", "ck_merge_history__customers_different")).isTrue();
                 assertThat(constraintExists(connection, "admission_opportunities", "ck_admission_opportunities__lost_note_required")).isTrue();
                 assertThat(constraintExists(connection, "stage_history", "ck_stage_history__changed_by_type")).isTrue();
+                assertThat(constraintExists(connection, "activities", "ck_activities__outbound_result_required")).isTrue();
                 assertThat(databaseObjectExists(connection, "idx_import_rows__tenant_batch_status")).isTrue();
                 assertThat(rowExists(connection, "roles", "role_code", "ADVISOR")).isTrue();
                 assertThat(rowExists(connection, "permissions", "function_code", "user.manage")).isTrue();
@@ -98,11 +103,15 @@ class FlywayMigrationIT {
                 assertThat(rowExists(connection, "permissions", "function_code", "data.export")).isTrue();
                 assertThat(rowExists(connection, "permissions", "function_code", "payment.write")).isTrue();
                 assertThat(rowExists(connection, "permissions", "function_code", "duplicate.manage")).isTrue();
+                assertThat(rowExists(connection, "permissions", "function_code", ACTIVITY_VIEW_PERMISSION_CODE)).isTrue();
+                assertThat(rowExists(connection, "permissions", "function_code", ACTIVITY_CREATE_PERMISSION_CODE)).isTrue();
                 assertThat(permissionProfileExists(connection, EXISTING_TENANT_ID, "ADMIN", DUPLICATE_PERMISSION_CODE, "MANAGE", "TENANT")).isTrue();
                 assertThat(permissionProfileExists(connection, EXISTING_TENANT_ID, "SALES_LEAD", DUPLICATE_PERMISSION_CODE, "MANAGE", "BRANCH")).isTrue();
                 assertThat(permissionProfileExists(connection, EXISTING_TENANT_ID, "ADMIN", CUSTOMER_MERGE_PERMISSION_CODE, "MANAGE", "TENANT")).isTrue();
                 assertThat(permissionProfileExists(connection, EXISTING_TENANT_ID, "ADMIN", OPPORTUNITY_UPDATE_PERMISSION_CODE, "MANAGE", "TENANT")).isTrue();
                 assertThat(permissionProfileExists(connection, EXISTING_TENANT_ID, "ADVISOR", OPPORTUNITY_UPDATE_PERMISSION_CODE, "UPDATE", "OWN")).isTrue();
+                assertThat(permissionProfileExists(connection, EXISTING_TENANT_ID, "ADMIN", ACTIVITY_VIEW_PERMISSION_CODE, "VIEW", "TENANT")).isTrue();
+                assertThat(permissionProfileExists(connection, EXISTING_TENANT_ID, "ADVISOR", ACTIVITY_CREATE_PERMISSION_CODE, "CREATE", "OWN")).isTrue();
             }
         } finally {
             TimeZone.setDefault(originalTimeZone);

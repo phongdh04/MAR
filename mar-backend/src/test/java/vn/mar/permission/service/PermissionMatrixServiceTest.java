@@ -29,6 +29,7 @@ import vn.mar.authz.model.PermissionScope;
 import vn.mar.authz.repository.PermissionProfileRepository;
 import vn.mar.common.error.ErrorCode;
 import vn.mar.common.exception.BusinessException;
+import vn.mar.common.exception.ValidationException;
 import vn.mar.common.time.TimeProvider;
 import vn.mar.permission.dto.request.PermissionMatrixChangeRequest;
 import vn.mar.permission.dto.request.UpdatePermissionMatrixRequest;
@@ -230,6 +231,35 @@ class PermissionMatrixServiceTest {
                 .isInstanceOf(BusinessException.class)
                 .extracting("errorCode")
                 .isEqualTo(ErrorCode.INVALID_PERMISSION_GUARDRAIL);
+    }
+
+    @Test
+    void updateMatrix_whenAccessLevelInvalid_shouldRejectWithFieldDetail() {
+        when(permissionProfileRepository.findByTenantId(TENANT_ID)).thenReturn(List.of());
+        when(roleRepository.existsByRoleCodeAndStatus("SALES_LEAD", RoleStatus.ACTIVE)).thenReturn(true);
+        when(permissionProfileRepository.existsActiveFunctionCode(PermissionCodes.IMPORT_MANAGE)).thenReturn(true);
+
+        assertThatThrownBy(() -> permissionMatrixService.updateMatrix(new UpdatePermissionMatrixRequest(
+                List.of(new PermissionMatrixChangeRequest(
+                        "SALES_LEAD",
+                        PermissionCodes.IMPORT_MANAGE,
+                        "SUPERPOWER",
+                        "TENANT"
+                )),
+                "Try invalid access level"
+        )))
+                .isInstanceOf(ValidationException.class)
+                .satisfies(error -> assertThat(((ValidationException) error).getDetails())
+                        .singleElement()
+                        .satisfies(detail -> {
+                            assertThat(detail.field()).isEqualTo("access_level");
+                            assertThat(detail.code()).isEqualTo("INVALID_ACCESS_LEVEL");
+                            assertThat(detail.message()).isEqualTo("Access level is invalid");
+                        }));
+
+        verify(permissionProfileRepository, never()).insert(any(PermissionProfile.class));
+        verify(permissionProfileRepository, never()).update(any(PermissionProfile.class));
+        verify(auditService, never()).record(any(AuditRecordCommand.class));
     }
 
     private PermissionProfile adminPermissionManage() {

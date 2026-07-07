@@ -55,8 +55,10 @@ import vn.mar.common.exception.ValidationException;
 import vn.mar.common.logging.LogContext;
 import vn.mar.common.pagination.PageResponse;
 import vn.mar.common.pagination.PageRequestFactory;
+import vn.mar.common.search.SearchText;
 import vn.mar.common.tenant.TenantContext;
 import vn.mar.common.time.TimeProvider;
+import vn.mar.common.validation.EnumParser;
 import vn.mar.security.context.CurrentUser;
 import vn.mar.security.context.CurrentUserContext;
 import vn.mar.user.entity.User;
@@ -504,43 +506,24 @@ public class AssignmentRuleService {
         if (!StringUtils.hasText(value)) {
             throw ValidationException.of("assignment_strategy", "REQUIRED", "Assignment strategy is required");
         }
-        try {
-            return AssignmentStrategy.valueOf(value.trim().toUpperCase(Locale.ROOT));
-        } catch (IllegalArgumentException exception) {
-            throw ValidationException.of("assignment_strategy", "INVALID", "Assignment strategy is invalid");
-        }
+        return EnumParser.optionalEnum(AssignmentStrategy.class, value, "assignment_strategy", "INVALID", "Assignment strategy is invalid");
     }
 
     private AssignmentRuleStatus resolveStatus(String value, boolean required, AssignmentRuleStatus defaultStatus) {
-        if (!StringUtils.hasText(value)) {
-            if (required) {
-                throw ValidationException.of("status", "REQUIRED", "Assignment rule status is required");
-            }
-            return defaultStatus;
+        if (required && !StringUtils.hasText(value)) {
+            throw ValidationException.of("status", "REQUIRED", "Assignment rule status is required");
         }
-        try {
-            return AssignmentRuleStatus.valueOf(value.trim().toUpperCase(Locale.ROOT));
-        } catch (IllegalArgumentException exception) {
-            throw ValidationException.of("status", "INVALID", "Assignment rule status is invalid");
-        }
+        AssignmentRuleStatus status = EnumParser.optionalEnum(AssignmentRuleStatus.class, value, "status", "INVALID", "Assignment rule status is invalid");
+        return status == null ? defaultStatus : status;
     }
 
     private UnassignedAssignmentItemStatus resolveUnassignedStatus(String value) {
-        if (!StringUtils.hasText(value)) {
-            return UnassignedAssignmentItemStatus.OPEN;
-        }
-        try {
-            return UnassignedAssignmentItemStatus.valueOf(value.trim().toUpperCase(Locale.ROOT));
-        } catch (IllegalArgumentException exception) {
-            throw ValidationException.of("status", "INVALID", "Unassigned item status is invalid");
-        }
+        UnassignedAssignmentItemStatus status = EnumParser.optionalEnum(UnassignedAssignmentItemStatus.class, value, "status", "INVALID", "Unassigned item status is invalid");
+        return status == null ? UnassignedAssignmentItemStatus.OPEN : status;
     }
 
     private String normalizeOptional(String value) {
-        if (!StringUtils.hasText(value)) {
-            return null;
-        }
-        return value.trim();
+        return SearchText.textOrNull(value);
     }
 
     private BusinessException duplicatePriority(int priority) {

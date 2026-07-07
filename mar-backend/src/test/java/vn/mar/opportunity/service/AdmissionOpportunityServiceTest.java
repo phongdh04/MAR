@@ -271,6 +271,30 @@ class AdmissionOpportunityServiceTest {
     }
 
     @Test
+    void searchOpportunities_whenStageInvalid_shouldRejectWithFieldDetail() {
+        allowAdmin("lead.view");
+
+        assertThatThrownBy(() -> admissionOpportunityService.searchOpportunities(new AdmissionOpportunitySearchCommand(
+                null,
+                "NOT_A_STAGE",
+                null,
+                null,
+                0,
+                20
+        )))
+                .isInstanceOf(ValidationException.class)
+                .satisfies(error -> assertThat(((ValidationException) error).getDetails())
+                        .singleElement()
+                        .satisfies(detail -> {
+                            assertThat(detail.field()).isEqualTo("stage");
+                            assertThat(detail.code()).isEqualTo("INVALID_STAGE");
+                            assertThat(detail.message()).isEqualTo("Opportunity stage is invalid");
+                        }));
+
+        verify(admissionOpportunityRepository, never()).search(any(), any(), any(), any(), any(), any());
+    }
+
+    @Test
     void getStageHistory_whenLeadViewPermission_shouldReturnTimeline() {
         allowAdmin("lead.view");
         when(admissionOpportunityRepository.findByIdAndTenantId(OPPORTUNITY_ID, TENANT_ID))

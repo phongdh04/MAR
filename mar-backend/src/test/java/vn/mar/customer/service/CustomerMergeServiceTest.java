@@ -22,6 +22,7 @@ import vn.mar.audit.model.AuditActions;
 import vn.mar.audit.service.AuditRecordCommand;
 import vn.mar.audit.service.AuditService;
 import vn.mar.authz.model.PermissionCodes;
+import vn.mar.authz.service.PermissionGuard;
 import vn.mar.common.error.ErrorCode;
 import vn.mar.common.exception.BusinessException;
 import vn.mar.customer.api.MergeHistorySnapshot;
@@ -72,7 +73,8 @@ class CustomerMergeServiceTest {
                 new MergeHistoryMapper(),
                 () -> NOW,
                 currentUserContext,
-                auditService
+                auditService,
+                new PermissionGuard()
         );
     }
 

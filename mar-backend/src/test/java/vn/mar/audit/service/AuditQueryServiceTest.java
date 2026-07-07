@@ -30,6 +30,7 @@ import vn.mar.audit.model.AuditActions;
 import vn.mar.audit.model.AuditResourceTypes;
 import vn.mar.audit.repository.AuditEventRepository;
 import vn.mar.authz.model.PermissionCodes;
+import vn.mar.authz.service.PermissionGuard;
 import vn.mar.common.error.ErrorCode;
 import vn.mar.common.exception.BusinessException;
 import vn.mar.common.exception.ValidationException;
@@ -60,7 +61,8 @@ class AuditQueryServiceTest {
         auditQueryService = new AuditQueryService(
                 auditEventRepository,
                 currentUserContext,
-                new AuditEventMapper()
+                new AuditEventMapper(),
+                new PermissionGuard()
         );
     }
 

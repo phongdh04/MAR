@@ -36,6 +36,7 @@ import vn.mar.common.pagination.PageRequestFactory;
 import vn.mar.common.search.SearchText;
 import vn.mar.common.tenant.TenantContext;
 import vn.mar.common.time.TimeProvider;
+import vn.mar.common.validation.EnumParser;
 import vn.mar.role.model.RoleCode;
 import vn.mar.role.model.RoleStatus;
 import vn.mar.role.repository.RoleRepository;
@@ -260,10 +261,7 @@ public class UserService {
     }
 
     private String normalizeOptional(String value) {
-        if (!StringUtils.hasText(value)) {
-            return null;
-        }
-        return value.trim();
+        return SearchText.textOrNull(value);
     }
 
     private String resolveOptionalForUpdate(String requestedValue, String currentValue) {
@@ -280,12 +278,7 @@ public class UserService {
             }
             return null;
         }
-        String roleCode = requestedRole.trim().toUpperCase(Locale.ROOT);
-        try {
-            RoleCode.valueOf(roleCode);
-        } catch (IllegalArgumentException exception) {
-            throw ValidationException.of("role", "INVALID_ROLE", "Role is invalid");
-        }
+        String roleCode = EnumParser.requiredEnum(RoleCode.class, requestedRole, "role", "INVALID_ROLE", "Role is invalid").name();
         if (!roleRepository.existsByRoleCodeAndStatus(roleCode, RoleStatus.ACTIVE)) {
             throw new BusinessException(ErrorCode.INVALID_PARENT_STATUS, "Role is inactive or not found");
         }
@@ -296,18 +289,11 @@ public class UserService {
         if (requestedStatus == null) {
             return fallbackStatus;
         }
-        if (!StringUtils.hasText(requestedStatus)) {
-            throw ValidationException.of("status", "INVALID_STATUS", "User status is invalid");
+        UserStatus status = EnumParser.requiredEnum(UserStatus.class, requestedStatus, "status", "INVALID_STATUS", "User status is invalid");
+        if (status == UserStatus.ACTIVE || status == UserStatus.INACTIVE) {
+            return status;
         }
-        try {
-            UserStatus status = UserStatus.valueOf(requestedStatus.trim().toUpperCase(Locale.ROOT));
-            if (status == UserStatus.ACTIVE || status == UserStatus.INACTIVE) {
-                return status;
-            }
-            throw ValidationException.of("status", "INVALID_STATUS", "User status is invalid");
-        } catch (IllegalArgumentException exception) {
-            throw ValidationException.of("status", "INVALID_STATUS", "User status is invalid");
-        }
+        throw ValidationException.of("status", "INVALID_STATUS", "User status is invalid");
     }
 
     private Set<UUID> normalizeBranchIds(Set<UUID> branchIds) {

@@ -38,6 +38,7 @@ import vn.mar.audit.service.AuditRecordCommand;
 import vn.mar.audit.service.AuditService;
 import vn.mar.authz.model.PermissionCodes;
 import vn.mar.authz.service.BranchScopeGuard;
+import vn.mar.authz.service.PermissionGuard;
 import vn.mar.common.error.ErrorCode;
 import vn.mar.common.error.ErrorDetail;
 import vn.mar.common.exception.BusinessException;
@@ -78,6 +79,7 @@ public class DefaultAssignmentEngineService implements AssignmentEngineService {
     private final AuditService auditService;
     private final TimeProvider timeProvider;
     private final BranchScopeGuard branchScopeGuard;
+    private final PermissionGuard permissionGuard;
 
     public DefaultAssignmentEngineService(
             AssignmentRuleRepository assignmentRuleRepository,
@@ -92,7 +94,8 @@ public class DefaultAssignmentEngineService implements AssignmentEngineService {
             CurrentUserContext currentUserContext,
             AuditService auditService,
             TimeProvider timeProvider,
-            BranchScopeGuard branchScopeGuard) {
+            BranchScopeGuard branchScopeGuard,
+            PermissionGuard permissionGuard) {
         this.assignmentRuleRepository = assignmentRuleRepository;
         this.assignmentRuleAdvisorRepository = assignmentRuleAdvisorRepository;
         this.assignmentPoolStateRepository = assignmentPoolStateRepository;
@@ -106,6 +109,7 @@ public class DefaultAssignmentEngineService implements AssignmentEngineService {
         this.auditService = auditService;
         this.timeProvider = timeProvider;
         this.branchScopeGuard = branchScopeGuard;
+        this.permissionGuard = permissionGuard;
     }
 
     @Override
@@ -419,12 +423,10 @@ public class DefaultAssignmentEngineService implements AssignmentEngineService {
     }
 
     private void assertCanTriggerAssignment(CurrentUser actor) {
-        if ("SYSTEM".equals(actor.roleCode())) {
+        if (actor != null && "SYSTEM".equals(actor.roleCode())) {
             return;
         }
-        if (!actor.hasPermission(PermissionCodes.ASSIGNMENT_MANAGE)) {
-            throw BusinessException.forbidden("permission", "ASSIGNMENT_MANAGE_DENIED", "Permission is required to trigger assignment");
-        }
+        permissionGuard.requirePermission(actor, PermissionCodes.ASSIGNMENT_MANAGE, "ASSIGNMENT_MANAGE_DENIED", "Permission is required to trigger assignment");
     }
 
     private void assertBranchScope(CurrentUser actor, UUID branchId) {

@@ -239,8 +239,11 @@ class TenantApiSmokeTest {
                                 }
                                 """))
                 .andExpect(status().isBadRequest())
+                .andExpect(header().string(RequestIdFilter.HEADER_NAME, "req_tenant_004"))
                 .andExpect(jsonPath("$.error.code").value("VALIDATION_ERROR"))
-                .andExpect(jsonPath("$.error.details[0].field").value("timezone"));
+                .andExpect(jsonPath("$.error.details[0].field").value("timezone"))
+                .andExpect(jsonPath("$.error.details[0].code").value("INVALID_TIMEZONE"))
+                .andExpect(jsonPath("$.meta.request_id").value("req_tenant_004"));
     }
 
     @Test
@@ -259,8 +262,11 @@ class TenantApiSmokeTest {
                                 }
                                 """))
                 .andExpect(status().isBadRequest())
+                .andExpect(header().string(RequestIdFilter.HEADER_NAME, "req_tenant_007"))
                 .andExpect(jsonPath("$.error.code").value("VALIDATION_ERROR"))
-                .andExpect(jsonPath("$.error.details[0].field").value("default_currency"));
+                .andExpect(jsonPath("$.error.details[0].field").value("default_currency"))
+                .andExpect(jsonPath("$.error.details[0].code").value("INVALID_CURRENCY"))
+                .andExpect(jsonPath("$.meta.request_id").value("req_tenant_007"));
     }
 
     @Test
@@ -279,8 +285,11 @@ class TenantApiSmokeTest {
                                 }
                                 """))
                 .andExpect(status().isBadRequest())
+                .andExpect(header().string(RequestIdFilter.HEADER_NAME, "req_tenant_008"))
                 .andExpect(jsonPath("$.error.code").value("VALIDATION_ERROR"))
-                .andExpect(jsonPath("$.error.details[0].field").value("status"));
+                .andExpect(jsonPath("$.error.details[0].field").value("status"))
+                .andExpect(jsonPath("$.error.details[0].code").value("INVALID_STATUS"))
+                .andExpect(jsonPath("$.meta.request_id").value("req_tenant_008"));
     }
 
     @Test

@@ -4,7 +4,6 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
@@ -22,6 +21,7 @@ import vn.mar.audit.service.AuditRecordCommand;
 import vn.mar.audit.service.AuditService;
 import vn.mar.authz.model.PermissionCodes;
 import vn.mar.authz.service.BranchScopeGuard;
+import vn.mar.authz.service.PermissionGuard;
 import vn.mar.branch.repository.BranchRepository;
 import vn.mar.common.error.ErrorCode;
 import vn.mar.common.error.ErrorDetail;
@@ -32,6 +32,7 @@ import vn.mar.common.pagination.PageResponse;
 import vn.mar.common.pagination.PageRequestFactory;
 import vn.mar.common.tenant.TenantContext;
 import vn.mar.common.time.TimeProvider;
+import vn.mar.common.validation.EnumParser;
 import vn.mar.lead.model.LeadTemperature;
 import vn.mar.security.context.CurrentUser;
 import vn.mar.security.context.CurrentUserContext;
@@ -68,6 +69,7 @@ public class SlaTaskService implements SlaTaskManagementService {
     private final TimeProvider timeProvider;
     private final SlaTaskMapper slaTaskMapper;
     private final BranchScopeGuard branchScopeGuard;
+    private final PermissionGuard permissionGuard;
 
     public SlaTaskService(
             SlaTaskRepository slaTaskRepository,
@@ -77,7 +79,8 @@ public class SlaTaskService implements SlaTaskManagementService {
             AuditService auditService,
             TimeProvider timeProvider,
             SlaTaskMapper slaTaskMapper,
-            BranchScopeGuard branchScopeGuard) {
+            BranchScopeGuard branchScopeGuard,
+            PermissionGuard permissionGuard) {
         this.slaTaskRepository = slaTaskRepository;
         this.slaPolicyLookupService = slaPolicyLookupService;
         this.branchRepository = branchRepository;
@@ -86,6 +89,7 @@ public class SlaTaskService implements SlaTaskManagementService {
         this.timeProvider = timeProvider;
         this.slaTaskMapper = slaTaskMapper;
         this.branchScopeGuard = branchScopeGuard;
+        this.permissionGuard = permissionGuard;
     }
 
     @Override
@@ -346,25 +350,11 @@ public class SlaTaskService implements SlaTaskManagementService {
     }
 
     private SlaTaskStatus parseStatus(String requestedStatus) {
-        if (!StringUtils.hasText(requestedStatus)) {
-            return null;
-        }
-        try {
-            return SlaTaskStatus.valueOf(normalizeEnum(requestedStatus));
-        } catch (IllegalArgumentException exception) {
-            throw ValidationException.of("status", "INVALID_STATUS", "SLA task status is invalid");
-        }
+        return EnumParser.optionalEnum(SlaTaskStatus.class, requestedStatus, "status", "INVALID_STATUS", "SLA task status is invalid");
     }
 
     private SlaTaskType parseTaskType(String requestedTaskType) {
-        if (!StringUtils.hasText(requestedTaskType)) {
-            return null;
-        }
-        try {
-            return SlaTaskType.valueOf(normalizeEnum(requestedTaskType));
-        } catch (IllegalArgumentException exception) {
-            throw ValidationException.of("task_type", "INVALID_TASK_TYPE", "SLA task type is invalid");
-        }
+        return EnumParser.optionalEnum(SlaTaskType.class, requestedTaskType, "task_type", "INVALID_TASK_TYPE", "SLA task type is invalid");
     }
 
     private void ensureBranchBelongsToTenant(UUID tenantId, UUID branchId) {
@@ -373,17 +363,16 @@ public class SlaTaskService implements SlaTaskManagementService {
     }
 
     private void assertCanViewTasks(CurrentUser actor) {
-        if (actor == null
-                || (!actor.hasPermission(PermissionCodes.SLA_TASK_VIEW)
-                && !actor.hasPermission(PermissionCodes.SLA_TASK_MANAGE))) {
-            throw BusinessException.forbidden("permission", "SLA_TASK_VIEW_DENIED", "Permission is required to view SLA tasks");
-        }
+        permissionGuard.requireAnyPermission(
+                actor,
+                List.of(PermissionCodes.SLA_TASK_VIEW, PermissionCodes.SLA_TASK_MANAGE),
+                "SLA_TASK_VIEW_DENIED",
+                "Permission is required to view SLA tasks"
+        );
     }
 
     private void assertCanManageTasks(CurrentUser actor) {
-        if (actor == null || !actor.hasPermission(PermissionCodes.SLA_TASK_MANAGE)) {
-            throw BusinessException.forbidden("permission", "SLA_TASK_MANAGE_DENIED", "Permission is required to manage SLA tasks");
-        }
+        permissionGuard.requirePermission(actor, PermissionCodes.SLA_TASK_MANAGE, "SLA_TASK_MANAGE_DENIED", "Permission is required to manage SLA tasks");
     }
 
 
@@ -412,10 +401,6 @@ public class SlaTaskService implements SlaTaskManagementService {
 
     private boolean isSalesLead(CurrentUser actor) {
         return actor != null && ROLE_SALES_LEAD.equals(actor.roleCode());
-    }
-
-    private String normalizeEnum(String value) {
-        return value.trim().toUpperCase(Locale.ROOT);
     }
 
     private Map<String, Object> toAuditData(SlaTask task) {

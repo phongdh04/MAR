@@ -6,6 +6,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import java.time.Instant;
@@ -24,9 +25,11 @@ import vn.mar.audit.service.AuditRecordCommand;
 import vn.mar.audit.service.AuditService;
 import vn.mar.authz.model.PermissionCodes;
 import vn.mar.authz.service.BranchScopeGuard;
+import vn.mar.authz.service.PermissionGuard;
 import vn.mar.branch.repository.BranchRepository;
 import vn.mar.common.error.ErrorCode;
 import vn.mar.common.exception.BusinessException;
+import vn.mar.common.exception.ValidationException;
 import vn.mar.common.time.TimeProvider;
 import vn.mar.lead.model.LeadTemperature;
 import vn.mar.security.context.CurrentUser;
@@ -90,12 +93,12 @@ class SlaTaskServiceTest {
                 slaTaskRepository,
                 slaPolicyLookupService,
                 branchRepository,
-                userBranchRepository,
                 currentUserContext,
                 auditService,
                 timeProvider,
                 new SlaTaskMapper(),
-                new BranchScopeGuard(userBranchRepository)
+                new BranchScopeGuard(userBranchRepository),
+                new PermissionGuard()
         );
     }
 
@@ -241,6 +244,30 @@ class SlaTaskServiceTest {
                 .isInstanceOf(BusinessException.class)
                 .extracting("errorCode")
                 .isEqualTo(ErrorCode.PERMISSION_DENIED);
+    }
+
+    @Test
+    void searchTasks_whenStatusInvalid_shouldRejectWithFieldDetail() {
+        allowAdmin(PermissionCodes.SLA_TASK_VIEW);
+
+        assertThatThrownBy(() -> slaTaskService.searchTasks(new SlaTaskSearchCommand(
+                null,
+                null,
+                "NOT_A_STATUS",
+                null,
+                0,
+                20
+        )))
+                .isInstanceOf(ValidationException.class)
+                .satisfies(error -> assertThat(((ValidationException) error).getDetails())
+                        .singleElement()
+                        .satisfies(detail -> {
+                            assertThat(detail.field()).isEqualTo("status");
+                            assertThat(detail.code()).isEqualTo("INVALID_STATUS");
+                            assertThat(detail.message()).isEqualTo("SLA task status is invalid");
+                        }));
+
+        verifyNoInteractions(slaTaskRepository);
     }
 
     private void allowAdmin(String... permissions) {

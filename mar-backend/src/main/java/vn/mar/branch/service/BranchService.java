@@ -36,6 +36,7 @@ import vn.mar.common.pagination.PageRequestFactory;
 import vn.mar.common.search.SearchText;
 import vn.mar.common.tenant.TenantContext;
 import vn.mar.common.time.TimeProvider;
+import vn.mar.common.validation.EnumParser;
 import vn.mar.security.context.CurrentUser;
 import vn.mar.security.context.CurrentUserContext;
 
@@ -179,24 +180,14 @@ public class BranchService {
     }
 
     private String normalizeOptional(String value) {
-        if (!StringUtils.hasText(value)) {
-            return null;
-        }
-        return value.trim();
+        return SearchText.textOrNull(value);
     }
 
     private BranchStatus resolveStatus(String requestedStatus, BranchStatus fallbackStatus) {
         if (requestedStatus == null) {
             return fallbackStatus;
         }
-        if (!StringUtils.hasText(requestedStatus)) {
-            throw ValidationException.of("status", "INVALID_STATUS", "Branch status is invalid");
-        }
-        try {
-            return BranchStatus.valueOf(requestedStatus.trim().toUpperCase(Locale.ROOT));
-        } catch (IllegalArgumentException exception) {
-            throw ValidationException.of("status", "INVALID_STATUS", "Branch status is invalid");
-        }
+        return EnumParser.requiredEnum(BranchStatus.class, requestedStatus, "status", "INVALID_STATUS", "Branch status is invalid");
     }
 
     private String resolveBranchCode(String requestedBranchCode, String branchName, UUID branchId) {

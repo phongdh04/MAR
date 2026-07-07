@@ -23,7 +23,9 @@ import vn.mar.common.exception.BusinessException;
 import vn.mar.common.exception.ResourceNotFoundException;
 import vn.mar.common.exception.ValidationException;
 import vn.mar.common.logging.LogContext;
+import vn.mar.common.search.SearchText;
 import vn.mar.common.time.TimeProvider;
+import vn.mar.common.validation.EnumParser;
 import vn.mar.permission.service.PermissionMatrixInitializationService;
 import vn.mar.security.context.CurrentUser;
 import vn.mar.security.context.CurrentUserContext;
@@ -182,14 +184,7 @@ public class TenantService {
         if (requestedStatus == null) {
             return fallbackStatus;
         }
-        if (!StringUtils.hasText(requestedStatus)) {
-            throw ValidationException.of("status", "INVALID_STATUS", "Tenant status is invalid");
-        }
-        try {
-            return TenantStatus.valueOf(requestedStatus.trim().toUpperCase(Locale.ROOT));
-        } catch (IllegalArgumentException exception) {
-            throw ValidationException.of("status", "INVALID_STATUS", "Tenant status is invalid");
-        }
+        return EnumParser.requiredEnum(TenantStatus.class, requestedStatus, "status", "INVALID_STATUS", "Tenant status is invalid");
     }
 
     private String resolveTenantCode(String requestedTenantCode, String tenantName, UUID tenantId) {
@@ -261,10 +256,7 @@ public class TenantService {
     }
 
     private String normalizeReason(String reason) {
-        if (!StringUtils.hasText(reason)) {
-            return null;
-        }
-        return reason.trim();
+        return SearchText.textOrNull(reason);
     }
 
 }

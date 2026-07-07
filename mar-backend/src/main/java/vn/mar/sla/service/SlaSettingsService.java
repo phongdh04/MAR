@@ -28,6 +28,7 @@ import vn.mar.audit.service.AuditRecordCommand;
 import vn.mar.audit.service.AuditService;
 import vn.mar.authz.model.PermissionCodes;
 import vn.mar.authz.service.BranchScopeGuard;
+import vn.mar.authz.service.PermissionGuard;
 import vn.mar.branch.repository.BranchRepository;
 import vn.mar.common.error.ErrorCode;
 import vn.mar.common.error.ErrorDetail;
@@ -36,6 +37,7 @@ import vn.mar.common.exception.ValidationException;
 import vn.mar.common.logging.LogContext;
 import vn.mar.common.tenant.TenantContext;
 import vn.mar.common.time.TimeProvider;
+import vn.mar.common.validation.EnumParser;
 import vn.mar.lead.model.LeadTemperature;
 import vn.mar.security.context.CurrentUser;
 import vn.mar.security.context.CurrentUserContext;
@@ -84,6 +86,7 @@ public class SlaSettingsService implements SlaPolicyLookupService {
     private final AuditService auditService;
     private final TimeProvider timeProvider;
     private final BranchScopeGuard branchScopeGuard;
+    private final PermissionGuard permissionGuard;
 
     public SlaSettingsService(
             WorkingHoursConfigRepository workingHoursConfigRepository,
@@ -93,7 +96,8 @@ public class SlaSettingsService implements SlaPolicyLookupService {
             CurrentUserContext currentUserContext,
             AuditService auditService,
             TimeProvider timeProvider,
-            BranchScopeGuard branchScopeGuard) {
+            BranchScopeGuard branchScopeGuard,
+            PermissionGuard permissionGuard) {
         this.workingHoursConfigRepository = workingHoursConfigRepository;
         this.slaPolicyRepository = slaPolicyRepository;
         this.tenantRepository = tenantRepository;
@@ -102,6 +106,7 @@ public class SlaSettingsService implements SlaPolicyLookupService {
         this.auditService = auditService;
         this.timeProvider = timeProvider;
         this.branchScopeGuard = branchScopeGuard;
+        this.permissionGuard = permissionGuard;
     }
 
     @Transactional(readOnly = true)
@@ -559,22 +564,14 @@ public class SlaSettingsService implements SlaPolicyLookupService {
         if (!StringUtils.hasText(value)) {
             throw ValidationException.of("weekday", "REQUIRED", "Weekday is required");
         }
-        try {
-            return DayOfWeek.valueOf(value.trim().toUpperCase(Locale.ROOT));
-        } catch (IllegalArgumentException exception) {
-            throw ValidationException.of("weekday", "INVALID", "Weekday is invalid");
-        }
+        return EnumParser.optionalEnum(DayOfWeek.class, value, "weekday", "INVALID", "Weekday is invalid");
     }
 
     private SlaPolicyType parseSlaPolicyType(String value) {
         if (!StringUtils.hasText(value)) {
             throw ValidationException.of("policy_type", "REQUIRED", "SLA policy type is required");
         }
-        try {
-            return SlaPolicyType.valueOf(value.trim().toUpperCase(Locale.ROOT));
-        } catch (IllegalArgumentException exception) {
-            throw ValidationException.of("policy_type", "INVALID", "SLA policy type is invalid");
-        }
+        return EnumParser.optionalEnum(SlaPolicyType.class, value, "policy_type", "INVALID", "SLA policy type is invalid");
     }
 
     private String normalizeTimezone(String timezone) {
@@ -602,16 +599,17 @@ public class SlaSettingsService implements SlaPolicyLookupService {
     }
 
     private void assertCanViewSlaSettings(CurrentUser actor, UUID branchId) {
-        if (!actor.hasPermission(PermissionCodes.SLA_VIEW) && !actor.hasPermission(PermissionCodes.SLA_MANAGE)) {
-            throw BusinessException.forbidden("permission", "MISSING_PERMISSION", "SLA view permission is required");
-        }
+        permissionGuard.requireAnyPermission(
+                actor,
+                List.of(PermissionCodes.SLA_VIEW, PermissionCodes.SLA_MANAGE),
+                "MISSING_PERMISSION",
+                "SLA view permission is required"
+        );
         assertBranchScope(actor, branchId, false);
     }
 
     private void assertCanManageSlaSettings(CurrentUser actor, UUID branchId) {
-        if (!actor.hasPermission(PermissionCodes.SLA_MANAGE)) {
-            throw BusinessException.forbidden("permission", "MISSING_PERMISSION", "SLA manage permission is required");
-        }
+        permissionGuard.requirePermission(actor, PermissionCodes.SLA_MANAGE, "MISSING_PERMISSION", "SLA manage permission is required");
         assertBranchScope(actor, branchId, true);
     }
 

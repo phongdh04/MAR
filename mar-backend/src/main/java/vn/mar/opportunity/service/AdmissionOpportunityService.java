@@ -6,7 +6,6 @@ import java.util.Collection;
 import java.util.EnumSet;
 import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -40,8 +39,10 @@ import vn.mar.common.exception.ValidationException;
 import vn.mar.common.logging.LogContext;
 import vn.mar.common.pagination.PageResponse;
 import vn.mar.common.pagination.PageRequestFactory;
+import vn.mar.common.search.SearchText;
 import vn.mar.common.tenant.TenantContext;
 import vn.mar.common.time.TimeProvider;
+import vn.mar.common.validation.EnumParser;
 import vn.mar.customer.entity.CustomerProfile;
 import vn.mar.customer.repository.CustomerProfileRepository;
 import vn.mar.lead.entity.Lead;
@@ -740,22 +741,14 @@ public class AdmissionOpportunityService implements AdmissionOpportunityManageme
     }
 
     private OpportunityStage resolveStage(String requestedStage) {
-        if (!StringUtils.hasText(requestedStage)) {
-            return null;
-        }
-        try {
-            return OpportunityStage.valueOf(normalizeEnum(requestedStage));
-        } catch (IllegalArgumentException exception) {
-            throw ValidationException.of("stage", "INVALID_STAGE", "Opportunity stage is invalid");
-        }
+        return EnumParser.optionalEnum(OpportunityStage.class, requestedStage, "stage", "INVALID_STAGE", "Opportunity stage is invalid");
     }
 
     private OpportunityStage resolveRequiredStage(String requestedStage) {
-        try {
-            return OpportunityStage.valueOf(normalizeEnum(requestedStage));
-        } catch (IllegalArgumentException exception) {
-            throw ValidationException.of("to_stage", "INVALID_STAGE", "Target stage is invalid");
+        if (!StringUtils.hasText(requestedStage)) {
+            throw ValidationException.of("to_stage", "REQUIRED", "Target stage is required");
         }
+        return EnumParser.optionalEnum(OpportunityStage.class, requestedStage, "to_stage", "INVALID_STAGE", "Target stage is invalid");
     }
 
     private LostReason resolveLostReasonForStage(OpportunityStage toStage, String requestedLostReason) {
@@ -769,11 +762,7 @@ public class AdmissionOpportunityService implements AdmissionOpportunityManageme
                     List.of(ErrorDetail.of("lost_reason", "REQUIRED", "Lost reason is required"))
             );
         }
-        try {
-            return LostReason.valueOf(normalizeEnum(requestedLostReason));
-        } catch (IllegalArgumentException exception) {
-            throw ValidationException.of("lost_reason", "INVALID_LOST_REASON", "Lost reason is invalid");
-        }
+        return EnumParser.optionalEnum(LostReason.class, requestedLostReason, "lost_reason", "INVALID_LOST_REASON", "Lost reason is invalid");
     }
 
     private QualificationStatus resolveQualificationStatus(
@@ -782,14 +771,7 @@ public class AdmissionOpportunityService implements AdmissionOpportunityManageme
         if (requestedStatus == null) {
             return currentStatus;
         }
-        if (!StringUtils.hasText(requestedStatus)) {
-            throw ValidationException.of("qualification_status", "INVALID_QUALIFICATION_STATUS", "Qualification status is invalid");
-        }
-        try {
-            return QualificationStatus.valueOf(normalizeEnum(requestedStatus));
-        } catch (IllegalArgumentException exception) {
-            throw ValidationException.of("qualification_status", "INVALID_QUALIFICATION_STATUS", "Qualification status is invalid");
-        }
+        return EnumParser.requiredEnum(QualificationStatus.class, requestedStatus, "qualification_status", "INVALID_QUALIFICATION_STATUS", "Qualification status is invalid");
     }
 
     private TouchpointType toTouchpointType(LeadSourceType sourceType) {
@@ -805,11 +787,10 @@ public class AdmissionOpportunityService implements AdmissionOpportunityManageme
     }
 
     private ActivityType resolveActivityType(String requestedType) {
-        try {
-            return ActivityType.valueOf(normalizeEnum(requestedType));
-        } catch (IllegalArgumentException exception) {
-            throw ValidationException.of("activity_type", "INVALID_ACTIVITY_TYPE", "Activity type is invalid");
+        if (!StringUtils.hasText(requestedType)) {
+            throw ValidationException.of("activity_type", "REQUIRED", "Activity type is required");
         }
+        return EnumParser.optionalEnum(ActivityType.class, requestedType, "activity_type", "INVALID_ACTIVITY_TYPE", "Activity type is invalid");
     }
 
     private ActivityResult resolveActivityResult(ActivityType activityType, String requestedResult) {
@@ -819,19 +800,14 @@ public class AdmissionOpportunityService implements AdmissionOpportunityManageme
             }
             return null;
         }
-        try {
-            return ActivityResult.valueOf(normalizeEnum(requestedResult));
-        } catch (IllegalArgumentException exception) {
-            throw ValidationException.of("activity_result", "INVALID_ACTIVITY_RESULT", "Activity result is invalid");
-        }
+        return EnumParser.optionalEnum(ActivityResult.class, requestedResult, "activity_result", "INVALID_ACTIVITY_RESULT", "Activity result is invalid");
     }
 
     private ActivitySource resolveActivitySource(String requestedSource) {
-        try {
-            return ActivitySource.valueOf(normalizeEnum(requestedSource));
-        } catch (IllegalArgumentException exception) {
-            throw ValidationException.of("source", "INVALID_ACTIVITY_SOURCE", "Activity source is invalid");
+        if (!StringUtils.hasText(requestedSource)) {
+            throw ValidationException.of("source", "REQUIRED", "Activity source is required");
         }
+        return EnumParser.optionalEnum(ActivitySource.class, requestedSource, "source", "INVALID_ACTIVITY_SOURCE", "Activity source is invalid");
     }
 
     private void validateActivityTiming(Instant occurredAt, Instant nextActionAt) {
@@ -914,15 +890,8 @@ public class AdmissionOpportunityService implements AdmissionOpportunityManageme
         return Sort.by(Sort.Direction.DESC, "createdAt");
     }
 
-    private String normalizeEnum(String value) {
-        return value.trim().toUpperCase(Locale.ROOT);
-    }
-
     private String normalizeOptional(String value) {
-        if (!StringUtils.hasText(value)) {
-            return null;
-        }
-        return value.trim();
+        return SearchText.textOrNull(value);
     }
 
     private UUID requireId(UUID id, String field, String message) {

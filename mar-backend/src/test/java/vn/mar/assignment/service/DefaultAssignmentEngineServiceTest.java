@@ -1,10 +1,12 @@
 package vn.mar.assignment.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import java.time.Instant;
@@ -39,6 +41,9 @@ import vn.mar.assignment.repository.UnassignedAssignmentItemRepository;
 import vn.mar.audit.service.AuditService;
 import vn.mar.authz.model.PermissionCodes;
 import vn.mar.authz.service.BranchScopeGuard;
+import vn.mar.authz.service.PermissionGuard;
+import vn.mar.common.error.ErrorCode;
+import vn.mar.common.exception.BusinessException;
 import vn.mar.common.time.TimeProvider;
 import vn.mar.opportunity.api.AssignOpportunityOwnerCommand;
 import vn.mar.opportunity.api.OpportunityAssignmentService;
@@ -120,7 +125,8 @@ class DefaultAssignmentEngineServiceTest {
                 currentUserContext,
                 auditService,
                 timeProvider,
-                new BranchScopeGuard(userBranchRepository)
+                new BranchScopeGuard(userBranchRepository),
+                new PermissionGuard()
         );
     }
 
@@ -219,6 +225,33 @@ class DefaultAssignmentEngineServiceTest {
         assertThat(result.unassignedItemId()).isNotNull();
         verify(opportunityAssignmentService, never()).assignOwner(any());
         verify(slaTaskManagementService, never()).openFirstResponseTask(any());
+    }
+
+    @Test
+    void assignOpportunity_whenActorMissingAssignmentManage_shouldRejectBeforeSideEffects() {
+        when(currentUserContext.currentUser()).thenReturn(new CurrentUser(
+                ACTOR_ID,
+                TENANT_ID,
+                "ADMIN",
+                Set.of(),
+                "req_assignment_unit_001"
+        ));
+
+        assertThatThrownBy(() -> assignmentEngineService.assignOpportunity(command()))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.PERMISSION_DENIED);
+
+        verifyNoInteractions(
+                assignmentRuleRepository,
+                assignmentRuleAdvisorRepository,
+                assignmentPoolStateRepository,
+                assignmentHistoryRepository,
+                unassignedAssignmentItemRepository,
+                opportunityAssignmentService,
+                slaTaskManagementService,
+                auditService
+        );
     }
 
     private void allowAssignmentManage() {

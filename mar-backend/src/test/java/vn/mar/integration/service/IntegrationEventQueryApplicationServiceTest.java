@@ -24,6 +24,7 @@ import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import vn.mar.authz.model.PermissionCodes;
+import vn.mar.authz.service.PermissionGuard;
 import vn.mar.common.error.ErrorCode;
 import vn.mar.common.exception.BusinessException;
 import vn.mar.common.exception.ValidationException;
@@ -66,7 +67,8 @@ class IntegrationEventQueryApplicationServiceTest {
         service = new IntegrationEventQueryApplicationService(
                 integrationEventRepository,
                 currentUserContext,
-                new IntegrationEventMapper()
+                new IntegrationEventMapper(),
+                new PermissionGuard()
         );
     }
 

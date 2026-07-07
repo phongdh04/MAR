@@ -9,6 +9,7 @@ import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import vn.mar.authz.model.PermissionCodes;
+import vn.mar.authz.service.PermissionGuard;
 import vn.mar.common.error.ErrorCode;
 import vn.mar.common.error.ErrorDetail;
 import vn.mar.common.exception.BusinessException;
@@ -17,6 +18,7 @@ import vn.mar.common.pagination.PageResponse;
 import vn.mar.common.pagination.PageRequestFactory;
 import vn.mar.common.search.SearchText;
 import vn.mar.common.tenant.TenantContext;
+import vn.mar.common.validation.EnumParser;
 import vn.mar.integration.api.IntegrationEventQueryService;
 import vn.mar.integration.api.IntegrationEventSearchCommand;
 import vn.mar.integration.api.IntegrationEventSnapshot;
@@ -35,14 +37,17 @@ public class IntegrationEventQueryApplicationService implements IntegrationEvent
     private final IntegrationEventRepository integrationEventRepository;
     private final CurrentUserContext currentUserContext;
     private final IntegrationEventMapper integrationEventMapper;
+    private final PermissionGuard permissionGuard;
 
     public IntegrationEventQueryApplicationService(
             IntegrationEventRepository integrationEventRepository,
             CurrentUserContext currentUserContext,
-            IntegrationEventMapper integrationEventMapper) {
+            IntegrationEventMapper integrationEventMapper,
+            PermissionGuard permissionGuard) {
         this.integrationEventRepository = integrationEventRepository;
         this.currentUserContext = currentUserContext;
         this.integrationEventMapper = integrationEventMapper;
+        this.permissionGuard = permissionGuard;
     }
 
     @Override
@@ -94,38 +99,16 @@ public class IntegrationEventQueryApplicationService implements IntegrationEvent
     }
 
     private void assertCanViewIntegrationLogs(CurrentUser actor) {
-        if (actor == null || !actor.hasPermission(PermissionCodes.INTEGRATION_LOG_VIEW)) {
-            throw new BusinessException(
-                    ErrorCode.PERMISSION_DENIED,
-                    "Permission is required to view integration logs",
-                    List.of(ErrorDetail.of("permission", "INTEGRATION_LOG_VIEW_DENIED", "Permission is required to view integration logs"))
-            );
-        }
+        permissionGuard.requirePermission(actor, PermissionCodes.INTEGRATION_LOG_VIEW, "INTEGRATION_LOG_VIEW_DENIED", "Permission is required to view integration logs");
     }
 
 
     private LeadSourceType resolveSourceType(String value) {
-        String sourceType = SearchText.upperOrNull(value);
-        if (sourceType == null) {
-            return null;
-        }
-        try {
-            return LeadSourceType.valueOf(sourceType);
-        } catch (IllegalArgumentException exception) {
-            throw ValidationException.of("source_type", "INVALID_SOURCE_TYPE", "Source type is invalid");
-        }
+        return EnumParser.optionalEnum(LeadSourceType.class, value, "source_type", "INVALID_SOURCE_TYPE", "Source type is invalid");
     }
 
     private IntegrationEventStatus resolveStatus(String value) {
-        String status = SearchText.upperOrNull(value);
-        if (status == null) {
-            return null;
-        }
-        try {
-            return IntegrationEventStatus.valueOf(status);
-        } catch (IllegalArgumentException exception) {
-            throw ValidationException.of("status", "INVALID_STATUS", "Integration event status is invalid");
-        }
+        return EnumParser.optionalEnum(IntegrationEventStatus.class, value, "status", "INVALID_STATUS", "Integration event status is invalid");
     }
 
     private void validateRange(Instant from, Instant to) {

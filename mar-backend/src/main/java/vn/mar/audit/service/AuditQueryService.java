@@ -15,6 +15,7 @@ import vn.mar.audit.entity.AuditEvent;
 import vn.mar.audit.mapper.AuditEventMapper;
 import vn.mar.audit.repository.AuditEventRepository;
 import vn.mar.authz.model.PermissionCodes;
+import vn.mar.authz.service.PermissionGuard;
 import vn.mar.common.error.ErrorCode;
 import vn.mar.common.error.ErrorDetail;
 import vn.mar.common.exception.BusinessException;
@@ -33,14 +34,17 @@ public class AuditQueryService implements AuditEventQueryService {
     private final AuditEventRepository auditEventRepository;
     private final CurrentUserContext currentUserContext;
     private final AuditEventMapper auditEventMapper;
+    private final PermissionGuard permissionGuard;
 
     public AuditQueryService(
             AuditEventRepository auditEventRepository,
             CurrentUserContext currentUserContext,
-            AuditEventMapper auditEventMapper) {
+            AuditEventMapper auditEventMapper,
+            PermissionGuard permissionGuard) {
         this.auditEventRepository = auditEventRepository;
         this.currentUserContext = currentUserContext;
         this.auditEventMapper = auditEventMapper;
+        this.permissionGuard = permissionGuard;
     }
 
     @Override
@@ -89,13 +93,7 @@ public class AuditQueryService implements AuditEventQueryService {
     }
 
     private void assertCanViewAudit(CurrentUser actor) {
-        if (actor == null || !actor.hasPermission(PermissionCodes.AUDIT_VIEW)) {
-            throw new BusinessException(
-                    ErrorCode.PERMISSION_DENIED,
-                    "Permission is required to view audit events",
-                    List.of(ErrorDetail.of("permission", "AUDIT_VIEW_DENIED", "Permission is required to view audit events"))
-            );
-        }
+        permissionGuard.requirePermission(actor, PermissionCodes.AUDIT_VIEW, "AUDIT_VIEW_DENIED", "Permission is required to view audit events");
     }
 
 

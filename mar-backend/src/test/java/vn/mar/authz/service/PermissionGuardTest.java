@@ -1,5 +1,6 @@
 package vn.mar.authz.service;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.util.List;
@@ -48,6 +49,28 @@ class PermissionGuardTest {
                 .isInstanceOf(BusinessException.class)
                 .extracting("errorCode")
                 .isEqualTo(ErrorCode.PERMISSION_DENIED);
+    }
+
+    @Test
+    void requirePermissionWithErrorMessage_whenActorMissing_shouldPreserveEnvelopeMessageAndDetail() {
+        assertThatThrownBy(() -> permissionGuard.requirePermission(
+                actor("activity.view"),
+                "lead.view",
+                "LEAD_VIEW_DENIED",
+                "Permission is required",
+                "Permission denied"
+        ))
+                .isInstanceOf(BusinessException.class)
+                .satisfies(exception -> {
+                    BusinessException businessException = (BusinessException) exception;
+                    assertThat(businessException.getErrorCode()).isEqualTo(ErrorCode.PERMISSION_DENIED);
+                    assertThat(businessException.getMessage()).isEqualTo("Permission denied");
+                    assertThat(businessException.getDetails()).singleElement().satisfies(detail -> {
+                        assertThat(detail.field()).isEqualTo("permission");
+                        assertThat(detail.code()).isEqualTo("LEAD_VIEW_DENIED");
+                        assertThat(detail.message()).isEqualTo("Permission is required");
+                    });
+                });
     }
 
     private CurrentUser actor(String... permissions) {

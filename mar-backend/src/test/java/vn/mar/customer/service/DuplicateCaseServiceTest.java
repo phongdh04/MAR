@@ -23,6 +23,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import vn.mar.audit.service.AuditRecordCommand;
 import vn.mar.audit.service.AuditService;
 import vn.mar.authz.model.PermissionCodes;
+import vn.mar.authz.service.PermissionGuard;
 import vn.mar.common.error.ErrorCode;
 import vn.mar.common.exception.BusinessException;
 import vn.mar.common.exception.ValidationException;
@@ -85,7 +86,8 @@ class DuplicateCaseServiceTest {
                 () -> NOW,
                 currentUserContext,
                 auditService,
-                customerMergeService
+                customerMergeService,
+                new PermissionGuard()
         );
     }
 

@@ -1,13 +1,11 @@
 package vn.mar.leadimport.service;
 
 import java.util.List;
-import java.util.Locale;
 import java.util.UUID;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.util.StringUtils;
 import vn.mar.common.error.ErrorCode;
 import vn.mar.common.error.ErrorDetail;
 import vn.mar.common.exception.BusinessException;
@@ -15,6 +13,7 @@ import vn.mar.common.exception.ValidationException;
 import vn.mar.common.pagination.PageResponse;
 import vn.mar.common.pagination.PageRequestFactory;
 import vn.mar.common.tenant.TenantContext;
+import vn.mar.common.validation.EnumParser;
 import vn.mar.leadimport.dto.request.ImportRowErrorSearchRequest;
 import vn.mar.leadimport.dto.request.LeadImportSearchRequest;
 import vn.mar.leadimport.dto.response.ImportBatchDetailResponse;
@@ -97,28 +96,14 @@ public class LeadImportQueryService {
         if (requestedStatus == null) {
             return null;
         }
-        if (!StringUtils.hasText(requestedStatus)) {
-            throw ValidationException.of("status", "INVALID_STATUS", "Import batch status is invalid");
-        }
-        try {
-            return ImportBatchStatus.valueOf(requestedStatus.trim().toUpperCase(Locale.ROOT));
-        } catch (IllegalArgumentException exception) {
-            throw ValidationException.of("status", "INVALID_STATUS", "Import batch status is invalid");
-        }
+        return EnumParser.requiredEnum(ImportBatchStatus.class, requestedStatus, "status", "INVALID_STATUS", "Import batch status is invalid");
     }
 
     private ImportSourceType resolveSourceType(String requestedSourceType) {
         if (requestedSourceType == null) {
             return null;
         }
-        if (!StringUtils.hasText(requestedSourceType)) {
-            throw ValidationException.of("source_type", "INVALID_SOURCE_TYPE", "Import source type is invalid");
-        }
-        try {
-            return ImportSourceType.valueOf(requestedSourceType.trim().toUpperCase(Locale.ROOT));
-        } catch (IllegalArgumentException exception) {
-            throw ValidationException.of("source_type", "INVALID_SOURCE_TYPE", "Import source type is invalid");
-        }
+        return EnumParser.requiredEnum(ImportSourceType.class, requestedSourceType, "source_type", "INVALID_SOURCE_TYPE", "Import source type is invalid");
     }
 
 

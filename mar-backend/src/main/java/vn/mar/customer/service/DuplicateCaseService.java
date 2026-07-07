@@ -20,6 +20,7 @@ import vn.mar.audit.model.AuditResourceTypes;
 import vn.mar.audit.service.AuditRecordCommand;
 import vn.mar.audit.service.AuditService;
 import vn.mar.authz.model.PermissionCodes;
+import vn.mar.authz.service.PermissionGuard;
 import vn.mar.common.error.ErrorCode;
 import vn.mar.common.error.ErrorDetail;
 import vn.mar.common.exception.BusinessException;
@@ -27,8 +28,10 @@ import vn.mar.common.exception.ValidationException;
 import vn.mar.common.logging.LogContext;
 import vn.mar.common.pagination.PageResponse;
 import vn.mar.common.pagination.PageRequestFactory;
+import vn.mar.common.search.SearchText;
 import vn.mar.common.tenant.TenantContext;
 import vn.mar.common.time.TimeProvider;
+import vn.mar.common.validation.EnumParser;
 import vn.mar.customer.api.DuplicateCaseCreateCommand;
 import vn.mar.customer.api.DuplicateCaseManagementService;
 import vn.mar.customer.api.DuplicateCaseResolveCommand;
@@ -63,6 +66,7 @@ public class DuplicateCaseService implements DuplicateCaseManagementService {
     private final CurrentUserContext currentUserContext;
     private final AuditService auditService;
     private final CustomerMergeService customerMergeService;
+    private final PermissionGuard permissionGuard;
 
     public DuplicateCaseService(
             DuplicateCaseRepository duplicateCaseRepository,
@@ -72,7 +76,8 @@ public class DuplicateCaseService implements DuplicateCaseManagementService {
             TimeProvider timeProvider,
             CurrentUserContext currentUserContext,
             AuditService auditService,
-            CustomerMergeService customerMergeService) {
+            CustomerMergeService customerMergeService,
+            PermissionGuard permissionGuard) {
         this.duplicateCaseRepository = duplicateCaseRepository;
         this.customerProfileRepository = customerProfileRepository;
         this.customerIdentityRepository = customerIdentityRepository;
@@ -81,6 +86,7 @@ public class DuplicateCaseService implements DuplicateCaseManagementService {
         this.currentUserContext = currentUserContext;
         this.auditService = auditService;
         this.customerMergeService = customerMergeService;
+        this.permissionGuard = permissionGuard;
     }
 
     @Override
@@ -118,7 +124,7 @@ public class DuplicateCaseService implements DuplicateCaseManagementService {
         String reason = requireText(command.reason(), "reason", "Duplicate resolution reason is required");
         CurrentUser actor = currentUserContext.currentUser();
         UUID tenantId = TenantContext.requireTenantId(actor);
-        assertHasPermission(actor, PermissionCodes.DUPLICATE_MANAGE, "DUPLICATE_RESOLVE_DENIED", "Permission is required to resolve duplicate cases");
+        permissionGuard.requirePermission(actor, PermissionCodes.DUPLICATE_MANAGE, "DUPLICATE_RESOLVE_DENIED", "Permission is required to resolve duplicate cases", "Permission denied");
         assertMergePermission(actor, action);
 
         DuplicateCase duplicateCase = duplicateCaseRepository.findByIdAndTenantId(
@@ -156,7 +162,7 @@ public class DuplicateCaseService implements DuplicateCaseManagementService {
     @Transactional(readOnly = true)
     public DuplicateCaseSnapshot findCase(UUID duplicateCaseId) {
         CurrentUser actor = currentUserContext.currentUser();
-        assertHasPermission(actor, PermissionCodes.DUPLICATE_MANAGE, "DUPLICATE_VIEW_DENIED", "Permission is required to view duplicate cases");
+        permissionGuard.requirePermission(actor, PermissionCodes.DUPLICATE_MANAGE, "DUPLICATE_VIEW_DENIED", "Permission is required to view duplicate cases", "Permission denied");
         return findCase(TenantContext.requireTenantId(actor), duplicateCaseId);
     }
 
@@ -181,7 +187,7 @@ public class DuplicateCaseService implements DuplicateCaseManagementService {
             throw ValidationException.of("command", "REQUIRED", "Duplicate case search command is required");
         }
         CurrentUser actor = currentUserContext.currentUser();
-        assertHasPermission(actor, PermissionCodes.DUPLICATE_MANAGE, "DUPLICATE_VIEW_DENIED", "Permission is required to view duplicate cases");
+        permissionGuard.requirePermission(actor, PermissionCodes.DUPLICATE_MANAGE, "DUPLICATE_VIEW_DENIED", "Permission is required to view duplicate cases", "Permission denied");
         UUID tenantId = TenantContext.requireTenantId(actor);
         DuplicateCaseStatus status = resolveStatus(command.status());
         DuplicateMatchType matchType = resolveMatchType(command.matchType());
@@ -378,50 +384,22 @@ public class DuplicateCaseService implements DuplicateCaseManagementService {
         if (!StringUtils.hasText(requestedAction)) {
             throw ValidationException.of("action", "REQUIRED", "Resolution action is required");
         }
-        try {
-            return DuplicateResolutionAction.valueOf(requestedAction.trim().toUpperCase(Locale.ROOT));
-        } catch (IllegalArgumentException exception) {
-            throw ValidationException.of("action", "INVALID_ACTION", "Resolution action is invalid");
-        }
+        return EnumParser.optionalEnum(DuplicateResolutionAction.class, requestedAction, "action", "INVALID_ACTION", "Resolution action is invalid");
     }
 
     private DuplicateCaseStatus resolveStatus(String requestedStatus) {
-        if (!StringUtils.hasText(requestedStatus)) {
-            return null;
-        }
-        try {
-            return DuplicateCaseStatus.valueOf(requestedStatus.trim().toUpperCase(Locale.ROOT));
-        } catch (IllegalArgumentException exception) {
-            throw ValidationException.of("status", "INVALID_STATUS", "Duplicate case status is invalid");
-        }
+        return EnumParser.optionalEnum(DuplicateCaseStatus.class, requestedStatus, "status", "INVALID_STATUS", "Duplicate case status is invalid");
     }
 
     private DuplicateMatchType resolveMatchType(String requestedMatchType) {
-        if (!StringUtils.hasText(requestedMatchType)) {
-            return null;
-        }
-        try {
-            return DuplicateMatchType.valueOf(requestedMatchType.trim().toUpperCase(Locale.ROOT));
-        } catch (IllegalArgumentException exception) {
-            throw ValidationException.of("match_type", "INVALID_MATCH_TYPE", "Duplicate match type is invalid");
-        }
+        return EnumParser.optionalEnum(DuplicateMatchType.class, requestedMatchType, "match_type", "INVALID_MATCH_TYPE", "Duplicate match type is invalid");
     }
 
 
 
     private void assertMergePermission(CurrentUser actor, DuplicateResolutionAction action) {
         if (action == DuplicateResolutionAction.MERGE) {
-            assertHasPermission(actor, PermissionCodes.CUSTOMER_MERGE, "CUSTOMER_MERGE_DENIED", "Permission is required to merge customers");
-        }
-    }
-
-    private void assertHasPermission(CurrentUser actor, String permissionCode, String detailCode, String message) {
-        if (!actor.hasPermission(permissionCode)) {
-            throw new BusinessException(
-                    ErrorCode.PERMISSION_DENIED,
-                    "Permission denied",
-                    List.of(ErrorDetail.of("permission", detailCode, message))
-            );
+            permissionGuard.requirePermission(actor, PermissionCodes.CUSTOMER_MERGE, "CUSTOMER_MERGE_DENIED", "Permission is required to merge customers", "Permission denied");
         }
     }
 
@@ -483,7 +461,7 @@ public class DuplicateCaseService implements DuplicateCaseManagementService {
     }
 
     private String normalizeOptionalRole(String role) {
-        return StringUtils.hasText(role) ? role.trim().toUpperCase(Locale.ROOT) : null;
+        return SearchText.upperOrNull(role);
     }
 
 

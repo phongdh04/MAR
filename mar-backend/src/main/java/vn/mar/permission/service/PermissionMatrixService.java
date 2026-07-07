@@ -29,6 +29,7 @@ import vn.mar.common.exception.ValidationException;
 import vn.mar.common.logging.LogContext;
 import vn.mar.common.tenant.TenantContext;
 import vn.mar.common.time.TimeProvider;
+import vn.mar.common.validation.EnumParser;
 import vn.mar.permission.dto.request.PermissionMatrixChangeRequest;
 import vn.mar.permission.dto.request.UpdatePermissionMatrixRequest;
 import vn.mar.permission.dto.response.PermissionMatrixResponse;
@@ -173,12 +174,7 @@ public class PermissionMatrixService {
         if (!StringUtils.hasText(requestedRole)) {
             throw ValidationException.of("role", "REQUIRED", "Role is required");
         }
-        String roleCode = requestedRole.trim().toUpperCase(Locale.ROOT);
-        try {
-            RoleCode.valueOf(roleCode);
-        } catch (IllegalArgumentException exception) {
-            throw ValidationException.of("role", "INVALID_ROLE", "Role is invalid");
-        }
+        String roleCode = EnumParser.requiredEnum(RoleCode.class, requestedRole, "role", "INVALID_ROLE", "Role is invalid").name();
         if (!roleRepository.existsByRoleCodeAndStatus(roleCode, RoleStatus.ACTIVE)) {
             throw new BusinessException(ErrorCode.INVALID_PARENT_STATUS, "Role is inactive or not found");
         }
@@ -203,11 +199,7 @@ public class PermissionMatrixService {
         if (!StringUtils.hasText(requestedAccessLevel)) {
             throw ValidationException.of("access_level", "REQUIRED", "Access level is required");
         }
-        try {
-            return PermissionAccessLevel.valueOf(requestedAccessLevel.trim().toUpperCase(Locale.ROOT));
-        } catch (IllegalArgumentException exception) {
-            throw ValidationException.of("access_level", "INVALID_ACCESS_LEVEL", "Access level is invalid");
-        }
+        return EnumParser.optionalEnum(PermissionAccessLevel.class, requestedAccessLevel, "access_level", "INVALID_ACCESS_LEVEL", "Access level is invalid");
     }
 
     private PermissionScope resolveScope(String requestedScope, PermissionAccessLevel accessLevel) {
@@ -217,14 +209,7 @@ public class PermissionMatrixService {
         if (requestedScope == null) {
             return PermissionScope.TENANT;
         }
-        if (!StringUtils.hasText(requestedScope)) {
-            throw ValidationException.of("scope", "INVALID_SCOPE", "Scope is invalid");
-        }
-        try {
-            return PermissionScope.valueOf(requestedScope.trim().toUpperCase(Locale.ROOT));
-        } catch (IllegalArgumentException exception) {
-            throw ValidationException.of("scope", "INVALID_SCOPE", "Scope is invalid");
-        }
+        return EnumParser.requiredEnum(PermissionScope.class, requestedScope, "scope", "INVALID_SCOPE", "Scope is invalid");
     }
 
     private void assertGuardrails(

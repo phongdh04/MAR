@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -27,9 +28,11 @@ import vn.mar.audit.service.AuditRecordCommand;
 import vn.mar.audit.service.AuditService;
 import vn.mar.authz.model.PermissionCodes;
 import vn.mar.authz.service.BranchScopeGuard;
+import vn.mar.authz.service.PermissionGuard;
 import vn.mar.branch.repository.BranchRepository;
 import vn.mar.common.error.ErrorCode;
 import vn.mar.common.exception.BusinessException;
+import vn.mar.common.exception.ValidationException;
 import vn.mar.common.time.TimeProvider;
 import vn.mar.lead.model.LeadTemperature;
 import vn.mar.security.context.CurrentUser;
@@ -39,6 +42,7 @@ import vn.mar.sla.api.DueTimeCalculationResult;
 import vn.mar.sla.dto.request.SlaPolicyItemRequest;
 import vn.mar.sla.dto.request.UpdateSlaPoliciesRequest;
 import vn.mar.sla.dto.request.UpdateWorkingHoursRequest;
+import vn.mar.sla.dto.request.WorkingHoursDayRequest;
 import vn.mar.sla.entity.SlaPolicy;
 import vn.mar.sla.entity.WorkingHoursConfig;
 import vn.mar.sla.model.SlaPolicyStatus;
@@ -94,7 +98,8 @@ class SlaSettingsServiceTest {
                 currentUserContext,
                 auditService,
                 timeProvider,
-                new BranchScopeGuard(userBranchRepository)
+                new BranchScopeGuard(userBranchRepository),
+                new PermissionGuard()
         );
     }
 
@@ -177,6 +182,36 @@ class SlaSettingsServiceTest {
     }
 
     @Test
+    void updateWorkingHours_whenWeekdayInvalid_shouldRejectWithFieldDetail() {
+        when(currentUserContext.currentUser()).thenReturn(admin(Set.of(PermissionCodes.SLA_MANAGE)));
+
+        assertThatThrownBy(() -> slaSettingsService.updateWorkingHours(new UpdateWorkingHoursRequest(
+                null,
+                TIMEZONE,
+                List.of(
+                        new WorkingHoursDayRequest("MOONDAY", true, LocalTime.of(8, 0), LocalTime.of(18, 0)),
+                        new WorkingHoursDayRequest("TUESDAY", true, LocalTime.of(8, 0), LocalTime.of(18, 0)),
+                        new WorkingHoursDayRequest("WEDNESDAY", true, LocalTime.of(8, 0), LocalTime.of(18, 0)),
+                        new WorkingHoursDayRequest("THURSDAY", true, LocalTime.of(8, 0), LocalTime.of(18, 0)),
+                        new WorkingHoursDayRequest("FRIDAY", true, LocalTime.of(8, 0), LocalTime.of(18, 0)),
+                        new WorkingHoursDayRequest("SATURDAY", true, LocalTime.of(8, 0), LocalTime.of(18, 0)),
+                        new WorkingHoursDayRequest("SUNDAY", false, null, null)
+                )
+        )))
+                .isInstanceOf(ValidationException.class)
+                .satisfies(error -> assertThat(((ValidationException) error).getDetails())
+                        .singleElement()
+                        .satisfies(detail -> {
+                            assertThat(detail.field()).isEqualTo("weekday");
+                            assertThat(detail.code()).isEqualTo("INVALID");
+                            assertThat(detail.message()).isEqualTo("Weekday is invalid");
+                        }));
+
+        verify(workingHoursConfigRepository, never()).saveAll(any());
+        verify(auditService, never()).record(any(AuditRecordCommand.class));
+    }
+
+    @Test
     void updateSlaPolicies_whenAdminManagesTenantDefault_shouldPersistPoliciesAndAudit() {
         stubTenant();
         when(currentUserContext.currentUser()).thenReturn(admin(Set.of(PermissionCodes.SLA_MANAGE)));
@@ -211,6 +246,32 @@ class SlaSettingsServiceTest {
         verify(auditService).record(auditCaptor.capture());
         assertThat(auditCaptor.getValue().action()).isEqualTo("SLA_POLICY_UPDATED");
         assertThat(savedPolicies).hasSize(3);
+    }
+
+    @Test
+    void updateSlaPolicies_whenPolicyTypeInvalid_shouldRejectWithFieldDetail() {
+        when(currentUserContext.currentUser()).thenReturn(admin(Set.of(PermissionCodes.SLA_MANAGE)));
+
+        assertThatThrownBy(() -> slaSettingsService.updateSlaPolicies(new UpdateSlaPoliciesRequest(
+                null,
+                TIMEZONE,
+                List.of(
+                        new SlaPolicyItemRequest("HOT", 10),
+                        new SlaPolicyItemRequest("NOT_A_POLICY", 45),
+                        new SlaPolicyItemRequest("AFTER_HOURS", 0)
+                )
+        )))
+                .isInstanceOf(ValidationException.class)
+                .satisfies(error -> assertThat(((ValidationException) error).getDetails())
+                        .singleElement()
+                        .satisfies(detail -> {
+                            assertThat(detail.field()).isEqualTo("policy_type");
+                            assertThat(detail.code()).isEqualTo("INVALID");
+                            assertThat(detail.message()).isEqualTo("SLA policy type is invalid");
+                        }));
+
+        verify(slaPolicyRepository, never()).saveAll(any());
+        verify(auditService, never()).record(any(AuditRecordCommand.class));
     }
 
     private void stubTenant() {

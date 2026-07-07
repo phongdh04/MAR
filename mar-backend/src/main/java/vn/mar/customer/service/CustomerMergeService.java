@@ -12,6 +12,7 @@ import vn.mar.audit.model.AuditResourceTypes;
 import vn.mar.audit.service.AuditRecordCommand;
 import vn.mar.audit.service.AuditService;
 import vn.mar.authz.model.PermissionCodes;
+import vn.mar.authz.service.PermissionGuard;
 import vn.mar.common.error.ErrorCode;
 import vn.mar.common.error.ErrorDetail;
 import vn.mar.common.exception.BusinessException;
@@ -43,6 +44,7 @@ public class CustomerMergeService implements CustomerMergeManagementService {
     private final TimeProvider timeProvider;
     private final CurrentUserContext currentUserContext;
     private final AuditService auditService;
+    private final PermissionGuard permissionGuard;
 
     public CustomerMergeService(
             MergeHistoryRepository mergeHistoryRepository,
@@ -50,13 +52,15 @@ public class CustomerMergeService implements CustomerMergeManagementService {
             MergeHistoryMapper mergeHistoryMapper,
             TimeProvider timeProvider,
             CurrentUserContext currentUserContext,
-            AuditService auditService) {
+            AuditService auditService,
+            PermissionGuard permissionGuard) {
         this.mergeHistoryRepository = mergeHistoryRepository;
         this.duplicateCaseRepository = duplicateCaseRepository;
         this.mergeHistoryMapper = mergeHistoryMapper;
         this.timeProvider = timeProvider;
         this.currentUserContext = currentUserContext;
         this.auditService = auditService;
+        this.permissionGuard = permissionGuard;
     }
 
     @Transactional
@@ -92,7 +96,7 @@ public class CustomerMergeService implements CustomerMergeManagementService {
         validateUnmergeCommand(command);
         CurrentUser actor = currentUserContext.currentUser();
         UUID tenantId = TenantContext.requireTenantId(actor);
-        assertHasPermission(actor, PermissionCodes.CUSTOMER_MERGE, "CUSTOMER_UNMERGE_DENIED", "Permission is required to unmerge customers");
+        permissionGuard.requirePermission(actor, PermissionCodes.CUSTOMER_MERGE, "CUSTOMER_UNMERGE_DENIED", "Permission is required to unmerge customers", "Permission denied");
         assertAdmin(actor);
         String reason = requireText(command.reason(), "reason", "Unmerge reason is required");
 
@@ -170,16 +174,6 @@ public class CustomerMergeService implements CustomerMergeManagementService {
                     ErrorCode.PERMISSION_DENIED,
                     "Permission denied",
                     List.of(ErrorDetail.of("role", "CUSTOMER_UNMERGE_ADMIN_REQUIRED", "Admin role is required to unmerge customers"))
-            );
-        }
-    }
-
-    private void assertHasPermission(CurrentUser actor, String permissionCode, String detailCode, String message) {
-        if (!actor.hasPermission(permissionCode)) {
-            throw new BusinessException(
-                    ErrorCode.PERMISSION_DENIED,
-                    "Permission denied",
-                    List.of(ErrorDetail.of("permission", detailCode, message))
             );
         }
     }

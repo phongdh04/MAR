@@ -50,6 +50,7 @@ import vn.mar.common.pagination.PageRequestFactory;
 import vn.mar.common.search.SearchText;
 import vn.mar.common.tenant.TenantContext;
 import vn.mar.common.time.TimeProvider;
+import vn.mar.common.validation.EnumParser;
 import vn.mar.security.context.CurrentUser;
 import vn.mar.security.context.CurrentUserContext;
 
@@ -533,24 +534,14 @@ public class CatalogService {
     }
 
     private String normalizeOptional(String value) {
-        if (!StringUtils.hasText(value)) {
-            return null;
-        }
-        return value.trim();
+        return SearchText.textOrNull(value);
     }
 
     private CatalogStatus resolveStatus(String requestedStatus, CatalogStatus fallbackStatus) {
         if (requestedStatus == null) {
             return fallbackStatus;
         }
-        if (!StringUtils.hasText(requestedStatus)) {
-            throw ValidationException.of("status", "INVALID_STATUS", "Catalog status is invalid");
-        }
-        try {
-            return CatalogStatus.valueOf(requestedStatus.trim().toUpperCase(Locale.ROOT));
-        } catch (IllegalArgumentException exception) {
-            throw ValidationException.of("status", "INVALID_STATUS", "Catalog status is invalid");
-        }
+        return EnumParser.requiredEnum(CatalogStatus.class, requestedStatus, "status", "INVALID_STATUS", "Catalog status is invalid");
     }
 
     private String resolveCode(String requestedCode, String name, UUID id, String codeField, String nameField) {

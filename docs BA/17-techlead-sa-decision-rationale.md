@@ -1,6 +1,6 @@
 # Tech Lead / SA Decision Rationale
 
-> Phiên bản cập nhật: `v2.2 - Dev baseline freeze - 2026-06-30`.
+> Phiên bản cập nhật: `v2.3 - Platform tenant permission ADR - 2026-07-07`.
 > Baseline kỹ thuật hiện hành: `Java 21 + Spring Boot ecosystem`, `PostgreSQL 17`, `Flyway`, `Spring Data JPA/Hibernate`, `Docker Compose local/QA`.
 > Ghi chú: technical baseline đã freeze; Docker được user chốt làm local/QA environment baseline.
 ## 1. Mục đích
@@ -54,6 +54,7 @@ Nguyên tắc đọc:
 | P0-13 | Team entity/scope | Team entity chưa chắc cần trong pilot; docs chốt defer | Không thêm Team table Sprint 1; reserve `TEAM` scope disabled để không phá permission model sau này | Không thêm Team sớm vì tăng schema/UX/test scope. Không bỏ hẳn `TEAM` scope vì sau này mở rộng khó hơn |
 | P0-14 | Sprint 1 non-goals | Sprint 1 là foundation; PO dễ kỳ vọng nhầm import/dedup/pipeline | PO phải xác nhận không claim Sprint 2/R1A nghiệp vụ đầy đủ | Không demo “giống hoàn tất” các feature chưa làm vì tạo sai kỳ vọng và QA không có basis nghiệm thu |
 | P0-15 | Final Go/No-Go | `13/14` là cửa dev commitment | Chỉ Go khi D01-D10 approved và release gate pass condition accepted | Không cho dev code trước sign-off vì các decision nền đổi sẽ gây sửa dây chuyền |
+| P0-17 | Platform tenant creation permission | Code hiện có `POST /api/v1/tenants` dùng `tenant.manage`, trong khi convention đã nói tenant creation là platform/bootstrap-level | Chốt ADR `20`: hướng đúng là dùng `platform.tenant.manage` cho create tenant; giữ `tenant.manage` cho update/get tenant-scoped. Chưa implement P2b trong batch này vì thiếu bootstrap/platform actor seed evidence | Không tiếp tục dùng `tenant.manage` dài hạn vì dễ trao quyền tạo tenant cho tenant admin. Không hard-code role `ADMIN/CEO` vì trái permission-based authz. Không đổi ngay sang platform permission table riêng vì scope lớn hơn remediation hiện tại |
 
 ## 5. Rationale cho P1 - chốt trước các slice R1A sau Sprint 1
 

@@ -1,6 +1,6 @@
 # README - MAR docs BA
 
-> Phiên bản cập nhật: `v2.3 - Dev kickoff package - 2026-06-30`.
+> Phiên bản cập nhật: `v2.4 - Platform tenant permission ADR - 2026-07-07`.
 > Baseline kỹ thuật hiện hành: `Java 21 + Spring Boot ecosystem`, `PostgreSQL 17`, `Flyway`, `Spring Data JPA/Hibernate`, `Docker Compose local/QA`.
 > Ghi chú: technical baseline đã freeze tại file `18-r1a-dev-baseline-freeze.md`; dev kickoff package đã tạo tại `19-r1a-dev-kickoff-package.md`.
 ## 1. Công dụng thư mục
@@ -19,6 +19,7 @@ Baseline freeze và dev kickoff đã được ghi tại:
 - `17-techlead-sa-decision-rationale.md`
 - `18-r1a-dev-baseline-freeze.md`
 - `19-r1a-dev-kickoff-package.md`
+- `20-r1a-platform-tenant-permission-adr.md`
 
 ## 2. Cách đọc nhanh
 
@@ -59,6 +60,7 @@ Quy tắc đọc: file càng về sau càng gần execution hơn. Nếu có lệ
 | [17-techlead-sa-decision-rationale.md](17-techlead-sa-decision-rationale.md) | Giải thích vì sao chốt từng decision, vì sao không chọn option khác và map với hiện trạng workspace/docs. | Dùng kèm file `16` trong buổi chốt kỹ thuật/kiến trúc. |
 | [18-r1a-dev-baseline-freeze.md](18-r1a-dev-baseline-freeze.md) | Biên bản freeze technical baseline trước dev kickoff/backend bootstrap. | Source of truth hiện tại cho quyết định Docker local/QA, readiness status và next implementation order. |
 | [19-r1a-dev-kickoff-package.md](19-r1a-dev-kickoff-package.md) | Gói kickoff triển khai backend bootstrap/foundation: ticket order, owner role, evidence, Docker/DB/Flyway contract. | File cần đọc ngay trước khi tạo backend repo/code. |
+| [20-r1a-platform-tenant-permission-adr.md](20-r1a-platform-tenant-permission-adr.md) | ADR chốt tenant creation là platform/bootstrap-level và đề xuất permission `platform.tenant.manage`. | P2b đang blocked cho tới khi có bootstrap/platform actor seed evidence; sau khi implement thì không dùng `tenant.manage` cho create tenant. |
 
 ## 4. Các vấn đề cần chốt nổi bật trước dev
 
@@ -73,6 +75,7 @@ Quy tắc đọc: file càng về sau càng gần execution hơn. Nếu có lệ
 | Final Go/No-Go | Development commitment decision | `13`, `14` |
 | Docker baseline | Local/QA dùng Docker Compose PostgreSQL 17 + app + seed/fixture runner | `16`, `17`, `18`, `our architecture/12` |
 | Dev kickoff | Ticket order, owner role, test/evidence và next implementation action | `18`, `19`, `our architecture/09`, `our architecture/12` |
+| Platform tenant permission | ADR đã chốt hướng `platform.tenant.manage`, nhưng code change phải chờ bootstrap/platform actor seed evidence | `16`, `17`, `20`, `our architecture/03`, `our architecture/05` |
 
 ## 5. Trạng thái sử dụng hiện tại
 

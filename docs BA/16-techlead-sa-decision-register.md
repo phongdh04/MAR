@@ -1,6 +1,6 @@
 # Tech Lead / Solution Architect Decision Register
 
-> Phiên bản cập nhật: `v2.2 - Dev baseline freeze - 2026-06-30`.
+> Phiên bản cập nhật: `v2.3 - Platform tenant permission ADR - 2026-07-07`.
 > Baseline kỹ thuật hiện hành: `Java 21 + Spring Boot ecosystem`, `PostgreSQL 17`, `Flyway`, `Spring Data JPA/Hibernate`, `Docker Compose local/QA`.
 > Ghi chú: technical baseline đã freeze; development commitment được mở cho backend bootstrap/foundation implementation planning.
 ## 1. Mục đích
@@ -51,6 +51,7 @@ Ghi chú: NestJS/Prisma không còn là baseline sau quyết định của User.
 | P0-14 | Sprint 1 non-goals | PO phải xác nhận không claim import preview/confirm, dedup, opportunity, pipeline, assignment/SLA, dashboard/payment. | PO + BA + Tech Lead | Yes | `10`, `13`, `14`, `15` |
 | P0-15 | Final Go/No-Go | Go for backend bootstrap/foundation implementation planning. Actual release gate remains pending implementation evidence. | PO + Tech Lead + SA + QA | Cleared for bootstrap | `13`, `14`, `README`, `18` |
 | P0-16 | Local/QA Docker baseline | User chốt dùng Docker. Local/QA baseline là Docker Compose PostgreSQL 17 + app + seed/fixture runner; DB schema tạo bằng Flyway, không tạo tay. | Tech Lead + DevOps/BE | Cleared for bootstrap | `13`, `14`, `16`, `17`, `our architecture/04`, `our architecture/12` |
+| P0-17 | Platform tenant creation permission | ADR accepted: đề xuất `platform.tenant.manage` cho `POST /api/v1/tenants`; giữ `tenant.manage` cho update/get tenant-scoped. Implementation P2b đang blocked cho tới khi có bootstrap/platform actor seed evidence. | SA + Tech Lead + Security/QA | Blocked for code until bootstrap actor decision | `20`, `our architecture/03`, `our architecture/05`, `convention-remediation-plan` |
 
 ## 4. P1 - cần chốt trước khi triển khai các story R1A sau Sprint 1
 
